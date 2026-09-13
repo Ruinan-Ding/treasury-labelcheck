@@ -89,8 +89,8 @@ function ResultCard({ result }: { result: ReturnType<typeof compareFields>["resu
 }
 
 export default function App() {
-  const [cases, setCases] = useState<LabelCase[]>(fixtureCases);
-  const [selectedId, setSelectedId] = useState(fixtureCases[0].id);
+  const [cases, setCases] = useState<LabelCase[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
@@ -216,14 +216,23 @@ export default function App() {
     setNotice(null);
   }
 
+  function loadSampleCases() {
+    setCases(fixtureCases);
+    setSelectedId(fixtureCases[0].id);
+    setReviewed({});
+    setPendingApplications([]);
+    setPendingImages([]);
+    setNotice({ tone: "info", text: `${fixtureCases.length} sample comparison cases loaded.` });
+  }
+
   function clearUploads() {
     // Object URLs are never reclaimed on their own. Revoked here rather than inside the
     // state updater, which React requires to be pure and invokes twice in StrictMode.
     cases.forEach((item) => {
       if (item.imageUrl && item.imageUrl.startsWith("blob:")) URL.revokeObjectURL(item.imageUrl);
     });
-    setCases(fixtureCases);
-    setSelectedId(fixtureCases[0].id);
+    setCases([]);
+    setSelectedId(null);
     setReviewed({});
     setPendingApplications([]);
     setPendingImages([]);
@@ -264,7 +273,31 @@ export default function App() {
     setNotice({ tone: "info", text: "Review queue exported locally. No files or results were sent anywhere." });
   }
 
-  if (!selected || !summary) return <main className="empty-state">No cases available.</main>;
+  if (!selected || !summary) return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand-lockup">
+          <div className="brand-icon" aria-hidden="true">LC</div>
+          <div><p className="eyebrow">Compliance workspace</p><h1>LabelCheck</h1></div>
+        </div>
+        <div className="topbar-meta"><span className="local-pill"><span className="online-dot" /> Local demo</span><span>On-device OCR · no network</span></div>
+      </header>
+      <div className="layout">
+        <aside className="sidebar" aria-label="Cases and uploads">
+          <div className="sidebar-heading"><div><p className="eyebrow">Verification queue</p><h2>Cases</h2></div><span className="count-badge">0</span></div>
+          <div className="upload-heading">Prepare a batch</div>
+          <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload application JSON files</strong><span>Stage records here before comparison</span><input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" /></label>
+          <div className="pending-files">{pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span key={item.key}>{item.file.name}</span>)}</div>
+          <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload label images</strong><span>Read locally with OCR · max {MAX_BATCH_SIZE}</span><input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" /></label>
+          <div className="pending-files">{pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span key={`${file.name}-${file.lastModified}`}>{file.name}</span>)}</div>
+          <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>{isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}</button>
+          <button className="secondary-button sample-button" type="button" onClick={loadSampleCases}>Load sample comparison cases</button>
+          <div className="sidebar-footnote"><strong>Bounded batch processing</strong><span>Up to {MAX_BATCH_SIZE} items, {DEFAULT_CONCURRENCY} in-process workers.</span></div>
+        </aside>
+        <main className="content empty-state"><div className="empty-card"><p className="eyebrow">Ready for review</p><h2>Start with a real batch</h2><p>Stage application JSON files and label images in the two upload boxes, then compare them. Nothing is preloaded.</p><button className="secondary-button" type="button" onClick={loadSampleCases}>Load sample comparison cases</button></div></main>
+      </div>
+    </div>
+  );
 
   // A refused file never reached the comparison rules; showing seven "Not available"
   // rows for it would imply a review that never happened.
@@ -318,6 +351,7 @@ export default function App() {
           <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>
             {isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}
           </button>
+          <button className="secondary-button sample-button" type="button" onClick={loadSampleCases}>Load sample comparison cases</button>
 
           <div className="fixture-label">{cases.length > fixtureCases.length ? "Uploaded and sample cases" : "Sample cases"}</div>
           <nav className="case-list">
