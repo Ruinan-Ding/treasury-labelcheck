@@ -59,13 +59,21 @@ Additional paired cases cover:
 - `low-contrast-review` — a deliberately degraded but readable image.
 - `unreadable-review` — a noisy image that should remain review-only.
 
-These are demo inputs, not additional Treasury requirements. They make the
+Unpaired inputs are included deliberately:
+
+- `unmatched-application.json` and `unmatched-application-2.json` — application
+  records with no corresponding image.
+- `unmatched-label.png` and `unmatched-label-2.png` — label images with no
+  corresponding application record.
+
+The directory contains 13 paired JSON/PNG cases plus two JSON-only and two
+image-only cases, enough to exercise normal matching, repeated uploads,
+mismatches, normalization, strict-warning failures, unreadable evidence,
+missing fields, and both unmatched-file directions. These are demo inputs, not additional Treasury requirements. They make the
 important decision paths reproducible without external image downloads.
 
 Upload a label image on its own and it is still read and checked against the statutory
 warning — that requirement comes from law, not from the application record.
-
-`sample-case.json` exercises the structured path with no image at all.
 
 The queue starts blank so the first screen reflects the real review workflow.
 For a reproducible demo, stage the paired JSON records and label images from
