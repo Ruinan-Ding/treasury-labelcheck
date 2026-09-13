@@ -77,7 +77,8 @@ separate. Files may be added at different times; comparison starts only when the
 clicks the compare button. Individual staged files can be removed with the `x` control,
 and **Reset workspace** clears the current batch and returns to the blank starting state.
 Matching is case-insensitive and uses the filename before
-the final extension. Staged lists scroll independently for large batches. Unmatched
+the final extension. The upload sidebar scrolls for large batches without shrinking
+the staged file rows. Unmatched
 records and images are still processed into explicit review cases with a red `!` queue
 icon rather than being dropped or paired by upload order.
 
