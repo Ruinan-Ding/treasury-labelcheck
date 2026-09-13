@@ -12,6 +12,10 @@ in [`docs/ASSIGNMENT.md`](docs/ASSIGNMENT.md).
 reviewer's machine. Nothing is uploaded, no API key is required, and the app makes no
 outbound request of any kind after the page loads.
 
+The deployed site is publicly hosted, but the label data is processed only in the
+reviewer's browser. The interface identifies this as **Browser-only processing** so
+hosting location is not confused with data-processing location.
+
 ---
 
 ## Quick start

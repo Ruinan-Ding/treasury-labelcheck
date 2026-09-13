@@ -368,7 +368,7 @@ export default function App() {
           <div className="brand-icon" aria-hidden="true">LC</div>
           <div><p className="eyebrow">Compliance workspace</p><h1>LabelCheck</h1></div>
         </div>
-        <div className="topbar-meta"><span className="local-pill"><span className="online-dot" /> Local demo</span><span>On-device OCR · no network</span></div>
+        <div className="topbar-meta"><span className="local-pill"><span className="online-dot" /> Browser-only processing</span><span>On-device OCR · no network</span></div>
       </header>
       <div className="layout">
         <aside className="sidebar" aria-label="Cases and uploads">
@@ -402,7 +402,7 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-meta">
-          <span className="local-pill"><span className="online-dot" /> Local demo</span>
+          <span className="local-pill"><span className="online-dot" /> Browser-only processing</span>
           <span>On-device OCR · no network</span>
         </div>
       </header>
