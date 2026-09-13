@@ -200,8 +200,7 @@ transparent rule-based signal, **not** a calibrated model probability.
 | IndexedDB (browser built-in) | Keeps the workspace, including image files, across a refresh without a server. |
 
 The only runtime dependencies are React, React DOM, and tesseract.js, and `npm audit`
-reports no vulnerabilities. GitHub Copilot and Claude Code were used as coding assistants
-during development.
+reports no vulnerabilities.
 
 ## Assumptions and trade-offs
 
