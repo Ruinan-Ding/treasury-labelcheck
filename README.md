@@ -82,6 +82,12 @@ the staged file rows. Unmatched
 records and images are still processed into explicit review cases with a red `!` queue
 icon rather than being dropped or paired by upload order.
 
+After inspecting a case, the agent can record a separate human decision:
+**Accept**, **Needs review**, or **Reject**. The selected decision is grayed out but
+can be changed, and its green, yellow, or red indicator appears beside the case in
+the verification queue. This decision is distinct from the automated comparison
+status and is included in the local CSV export.
+
 ## Approach
 
 The core loop the stakeholder interviews describe is: *an agent looks at the label

@@ -94,6 +94,10 @@ button { cursor: pointer; }
 .mini-match, .status-mark { color: #147658; background: #dff4e9; }
 .mini-mismatch { color: #af443b; background: #fce8e5; }
 .mini-review { color: #7d5609; background: #fff0cc; }
+.decision-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; }
+.decision-dot.decision-accept { background: #168260; }
+.decision-dot.decision-review { background: #d09a22; }
+.decision-dot.decision-reject { background: #c04f45; }
 .chevron { color: #6d8785; font-size: 20px; }
 .sidebar-footnote { border-top: 1px solid #e3edeb; margin-top: auto; padding: 17px 8px 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #52696b; }
 .sidebar-footnote strong { color: #446065; }
@@ -112,6 +116,10 @@ button { cursor: pointer; }
 .chip-mismatch { color: #aa413b; background: #fce6e3; }
 .chip-review { color: #7d5609; background: #fff0cb; }
 .reviewed-chip { background: #e7eff0; color: #446065; }
+.decision-chip { border-radius: 99px; padding: 8px 13px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.decision-chip-accept { color: #167357; background: #def3e8; }
+.decision-chip-review { color: #7d5609; background: #fff0cb; }
+.decision-chip-reject { color: #aa413b; background: #fce6e3; }
 .overview-grid { display: grid; grid-template-columns: repeat(3, minmax(110px, 1fr)) minmax(180px, 1.5fr); gap: 12px; margin-bottom: 31px; }
 .stat-card { min-height: 85px; background: white; border: 1px solid #e0ebe8; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; color: #52696b; font-size: 13px; }
 .stat-number { font: 700 27px "Segoe UI", Arial, sans-serif; }
@@ -175,6 +183,12 @@ button { cursor: pointer; }
 .evidence-note p { margin: 0; font-size: 13px; line-height: 1.5; }
 .primary-button { border: 0; width: 100%; border-radius: 7px; padding: 11px 14px; background: #14725f; color: white; font-weight: 700; font-size: 15px; }
 .primary-button:hover { background: #0f5d50; }
+.decision-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.decision-button { border: 1px solid; border-radius: 7px; padding: 10px 8px; font-size: 14px; font-weight: 700; }
+.decision-button.selected { filter: grayscale(1); opacity: .55; }
+.decision-accept { border-color: #73b99e; background: #e1f4ea; color: #167357; }
+.decision-review { border-color: #dfbd68; background: #fff3d2; color: #7d5609; }
+.decision-reject { border-color: #d88980; background: #fce8e5; color: #aa413b; }
 .notice { margin-top: 20px; padding: 11px 14px; background: #e8f4f0; border: 1px solid #c9e4da; color: #21564f; border-radius: 7px; font-size: 14px; }
 .notice-warn { background: #fff4e0; border-color: #e2bd77; color: #6f4b06; font-weight: 600; }
 .empty-state { padding: 50px; max-width: 640px; }

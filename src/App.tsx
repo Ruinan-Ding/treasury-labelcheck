@@ -26,6 +26,8 @@ interface PendingApplication {
   key: string;
 }
 
+type HumanDecision = "accept" | "review" | "reject";
+
 function statusLabel(status: VerificationStatus): string {
   return status === "match" ? "Match" : status === "mismatch" ? "Mismatch" : "Review";
 }
@@ -93,7 +95,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
+  const [decisions, setDecisions] = useState<Record<string, HumanDecision>>({});
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
@@ -239,7 +241,7 @@ export default function App() {
     });
     setCases([]);
     setSelectedId(null);
-    setReviewed({});
+    setDecisions({});
     setPendingApplications([]);
     setPendingImages([]);
     // Hands back the ~3 MB language model and the WASM core the OCR worker is holding.
@@ -247,14 +249,14 @@ export default function App() {
     setNotice({ tone: "info", text: "Workspace reset." });
   }
 
-  function markReviewed() {
+  function setDecision(decision: HumanDecision) {
     if (!selected) return;
-    setReviewed((current) => ({ ...current, [selected.id]: true }));
-    setNotice({ tone: "info", text: "Review recorded for this session. No automated decision replaces the agent." });
+    setDecisions((current) => ({ ...current, [selected.id]: decision }));
+    setNotice({ tone: "info", text: `${decision === "accept" ? "Accepted" : decision === "reject" ? "Rejected" : "Marked as needing review"} for this session. You can change this decision at any time.` });
   }
 
   function exportQueue() {
-    const header = ["Case", "Overall status", "Matches", "Mismatches", "Needs review", "Processing time (ms)", "Review recorded"];
+    const header = ["Case", "Overall status", "Matches", "Mismatches", "Needs review", "Processing time (ms)", "Human decision"];
     const rows = cases.map((item) => {
       const itemSummary = summaries.get(item.id) ?? compareCase(item);
       // A refused file was never compared, so it has no field counts to report.
@@ -266,7 +268,7 @@ export default function App() {
         refused ? "" : itemSummary.mismatched,
         refused ? "" : itemSummary.needsReview,
         item.processingTimeMs ?? "",
-        reviewed[item.id] ? "Yes" : "No"
+        decisions[item.id] ?? ""
       ];
     });
     const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
@@ -370,6 +372,7 @@ export default function App() {
                   aria-current={item.id === selected.id ? "true" : undefined}
                   onClick={() => selectCase(item.id)}
                 >
+                  {decisions[item.id] && <span className={`decision-dot decision-${decisions[item.id]}`} aria-label={`Human decision: ${decisions[item.id]}`} />}
                   <span className={`mini-status mini-${item.pairingStatus === "unmatched" ? "mismatch" : overall}`} aria-hidden="true">{item.pairingStatus === "unmatched" ? "!" : statusIcon(overall)}</span>
                   <span className="visually-hidden">{item.pairingStatus === "unmatched" ? "Unmatched file: " : `${statusLabel(overall)}: `}</span>
                   <span className="case-button-text">
@@ -405,7 +408,7 @@ export default function App() {
                 <span aria-hidden="true">{refused ? "!" : statusIcon(summary.overall)}</span>{" "}
                 {refused ? "Not processed" : statusLabel(summary.overall)}
               </span>
-              {reviewed[selected.id] && <span className="reviewed-chip">Reviewed</span>}
+              {decisions[selected.id] && <span className={`decision-chip decision-chip-${decisions[selected.id]}`}>{decisions[selected.id] === "accept" ? "Accepted" : decisions[selected.id] === "reject" ? "Rejected" : "Needs review"}</span>}
             </div>
           </section>
 
@@ -469,9 +472,11 @@ export default function App() {
                 <span className="info-icon" aria-hidden="true">i</span>
                 <p>Unreadable, low-confidence, or presentation-sensitive fields remain <strong>Review</strong> so an agent can decide.</p>
               </div>
-              <button className="primary-button" onClick={markReviewed}>
-                {reviewed[selected.id] ? "Review recorded" : "Mark case reviewed"}
-              </button>
+              <div className="decision-actions" aria-label="Human case decision">
+                <button className={`decision-button decision-accept ${decisions[selected.id] === "accept" ? "selected" : ""}`} onClick={() => setDecision("accept")}>Accept</button>
+                <button className={`decision-button decision-review ${decisions[selected.id] === "review" ? "selected" : ""}`} onClick={() => setDecision("review")}>Needs review</button>
+                <button className={`decision-button decision-reject ${decisions[selected.id] === "reject" ? "selected" : ""}`} onClick={() => setDecision("reject")}>Reject</button>
+              </div>
             </aside>
           </div>
           {notice && <div className={`notice notice-${notice.tone}`} role="status">{notice.text}</div>}
