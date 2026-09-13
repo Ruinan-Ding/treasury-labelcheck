@@ -68,11 +68,9 @@ warning — that requirement comes from law, not from the application record.
 `sample-case.json` exercises the structured path with no image at all.
 
 The queue starts blank so the first screen reflects the real review workflow.
-Use **Load sample comparison cases** when you want the built-in comparator
-scenarios (pass, mismatches, warning failure, brand normalization, and
-unreadable input) without preparing files. For a real batch, stage JSON records
-and label images in their separate upload boxes and click **Compare uploaded
-files**.
+For a reproducible demo, stage the paired JSON records and label images from
+`public/samples/` in their separate upload boxes and click **Compare uploaded
+files**. This exercises the same OCR and filename-pairing path as a real batch.
 
 The two upload boxes intentionally keep staged application records and label artwork
 separate. Files may be added at different times; comparison starts only when the agent

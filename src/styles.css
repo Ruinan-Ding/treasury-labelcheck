@@ -66,7 +66,6 @@ button { cursor: pointer; }
 .pending-files span { overflow: hidden; padding: 4px 7px; border: 1px solid #d8e4e1; border-radius: 4px; background: #f7faf9; text-overflow: ellipsis; white-space: nowrap; }
 .compare-button { width: 100%; margin: 4px 0 12px; }
 .compare-button:disabled { cursor: not-allowed; opacity: .5; }
-.sample-button { width: 100%; margin-bottom: 12px; }
 .empty-state { display: grid; place-items: center; min-height: 55vh; }
 .empty-card { max-width: 560px; padding: 42px; border: 1px solid #dce9e6; border-radius: 14px; background: #fff; box-shadow: 0 12px 30px rgba(24,49,58,.06); }
 .empty-card h2 { margin: 5px 0 12px; color: #18313a; font-size: 30px; letter-spacing: -.04em; }

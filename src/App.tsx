@@ -1,5 +1,4 @@
 import { ChangeEvent, useMemo, useState } from "react";
-import { fixtureCases } from "./data/fixtures";
 import { DEFAULT_CONCURRENCY, MAX_BATCH_SIZE, processBatch } from "./lib/batch";
 import { compareFields, FIELD_DEFINITIONS } from "./lib/verification";
 import { extractLabelFields } from "./lib/extract";
@@ -211,18 +210,9 @@ export default function App() {
     }
   }
 
-  function selectFixture(id: string) {
+  function selectCase(id: string) {
     setSelectedId(id);
     setNotice(null);
-  }
-
-  function loadSampleCases() {
-    setCases(fixtureCases);
-    setSelectedId(fixtureCases[0].id);
-    setReviewed({});
-    setPendingApplications([]);
-    setPendingImages([]);
-    setNotice({ tone: "info", text: `${fixtureCases.length} sample comparison cases loaded.` });
   }
 
   function clearUploads() {
@@ -238,7 +228,7 @@ export default function App() {
     setPendingImages([]);
     // Hands back the ~3 MB language model and the WASM core the OCR worker is holding.
     void terminateOcr();
-    setNotice({ tone: "info", text: "Uploaded cases cleared. The sample cases remain." });
+    setNotice({ tone: "info", text: "Uploaded cases cleared." });
   }
 
   function markReviewed() {
@@ -291,10 +281,9 @@ export default function App() {
           <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload label images</strong><span>Read locally with OCR · max {MAX_BATCH_SIZE}</span><input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" /></label>
           <div className="pending-files">{pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span key={`${file.name}-${file.lastModified}`}>{file.name}</span>)}</div>
           <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>{isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}</button>
-          <button className="secondary-button sample-button" type="button" onClick={loadSampleCases}>Load sample comparison cases</button>
           <div className="sidebar-footnote"><strong>Bounded batch processing</strong><span>Up to {MAX_BATCH_SIZE} items, {DEFAULT_CONCURRENCY} in-process workers.</span></div>
         </aside>
-        <main className="content empty-state"><div className="empty-card"><p className="eyebrow">Ready for review</p><h2>Start with a real batch</h2><p>Stage application JSON files and label images in the two upload boxes, then compare them. Nothing is preloaded.</p><button className="secondary-button" type="button" onClick={loadSampleCases}>Load sample comparison cases</button></div></main>
+        <main className="content empty-state"><div className="empty-card"><p className="eyebrow">Ready for review</p><h2>Start with a real batch</h2><p>Stage application JSON files and label images in the two upload boxes, then compare them. Nothing is preloaded.</p></div></main>
       </div>
     </div>
   );
@@ -351,9 +340,8 @@ export default function App() {
           <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>
             {isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}
           </button>
-          <button className="secondary-button sample-button" type="button" onClick={loadSampleCases}>Load sample comparison cases</button>
 
-          <div className="fixture-label">{cases.length > fixtureCases.length ? "Uploaded and sample cases" : "Sample cases"}</div>
+          <div className="fixture-label">Verification cases</div>
           <nav className="case-list">
             {cases.map((item) => {
               const overall = summaries.get(item.id)?.overall ?? "review";
@@ -362,7 +350,7 @@ export default function App() {
                   className={`case-button ${item.id === selected.id ? "active" : ""}`}
                   key={item.id}
                   aria-current={item.id === selected.id ? "true" : undefined}
-                  onClick={() => selectFixture(item.id)}
+                  onClick={() => selectCase(item.id)}
                 >
                   <span className={`mini-status mini-${overall}`} aria-hidden="true">{statusIcon(overall)}</span>
                   <span className="visually-hidden">{statusLabel(overall)}: </span>
@@ -390,7 +378,7 @@ export default function App() {
             </div>
             <div className="heading-actions">
               <button className="secondary-button" type="button" onClick={exportQueue}>Export CSV</button>
-              {cases.length > fixtureCases.length && (
+              {cases.length > 0 && (
                 // Disabled mid-batch: terminating the OCR worker strands the jobs still queued
                 // on it, so the batch would never finish and the upload box would stay locked.
                 <button className="secondary-button" type="button" onClick={clearUploads} disabled={isProcessing}>Clear uploads</button>
