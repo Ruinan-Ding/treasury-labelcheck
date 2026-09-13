@@ -20,6 +20,12 @@ interface Notice {
   text: string;
 }
 
+interface PendingApplication {
+  file: File;
+  fields: LabelFields;
+  key: string;
+}
+
 function statusLabel(status: VerificationStatus): string {
   return status === "match" ? "Match" : status === "mismatch" ? "Mismatch" : "Review";
 }
@@ -42,8 +48,8 @@ function inputStatusLabel(status: OcrStatus): string {
         : "Unreadable input";
 }
 
-const isJsonFile = (file: File): boolean =>
-  file.type === "application/json" || file.name.toLowerCase().endsWith(".json");
+const compareCase = (item: LabelCase) =>
+  compareFields(item.application, item.label, { ocr: item.ocrStatus === "ocr" });
 
 const timed = (item: LabelCase, startedAt: number): LabelCase => ({
   ...item,
@@ -89,120 +95,119 @@ export default function App() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>([]);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
 
   const selected = cases.find((item) => item.id === selectedId) || cases[0];
   // One pass per case list rather than one per case per render: the sidebar and the
   // CSV export both read from here.
   const summaries = useMemo(
-    () => new Map(cases.map((item) => [item.id, compareFields(item.application, item.label)] as const)),
+    () => new Map(cases.map((item) => [item.id, compareCase(item)] as const)),
     [cases]
   );
   const summary = selected ? summaries.get(selected.id) : undefined;
 
-  async function loadFiles(event: ChangeEvent<HTMLInputElement>) {
+  async function loadApplicationFiles(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    const files = Array.from(input.files || []).slice(0, MAX_BATCH_SIZE);
+    const records: PendingApplication[] = [];
+    const structured: LabelCase[] = [];
+    const invalid: string[] = [];
+    for (const file of files) {
+      try {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          invalid.push(`${file.name} exceeds 10 MB`);
+          continue;
+        }
+        const value = JSON.parse(await file.text());
+        const record = parseApplicationRecord(value);
+        if (record) {
+          records.push({ file, fields: record, key: pairingKey(file.name) });
+          continue;
+        }
+        const parsed = parseStructuredCase(value, file.name);
+        if (parsed) structured.push(parsed);
+        else invalid.push(`${file.name} is not an application record or complete structured case`);
+      } catch {
+        invalid.push(`${file.name} could not be parsed`);
+      }
+    }
+    if (structured.length > 0) {
+      setCases((current) => [...structured, ...current]);
+      setSelectedId(structured[0].id);
+    }
+    setPendingApplications((current) => [...current, ...records]);
+    setNotice({
+      tone: invalid.length > 0 ? "warn" : "info",
+      text: `${records.length} application record${records.length === 1 ? "" : "s"} staged for comparison.${structured.length > 0 ? ` ${structured.length} complete structured case${structured.length === 1 ? "" : "s"} loaded.` : ""}${invalid.length > 0 ? ` ${invalid.join("; ")}.` : ""}`
+    });
+    input.value = "";
+  }
+
+  function stageImageFiles(event: ChangeEvent<HTMLInputElement>) {
     const input = event.target;
     const selectedFiles = Array.from(input.files || []);
-    if (selectedFiles.length === 0) return;
-    const files = selectedFiles.slice(0, MAX_BATCH_SIZE);
-    const skipped = selectedFiles.length - files.length;
+    const accepted = selectedFiles.filter((file) => file.type.startsWith("image/"));
+    const rejected = selectedFiles.filter((file) => !file.type.startsWith("image/")).map((file) => file.name);
+    setPendingImages((current) => [...current, ...accepted].slice(0, MAX_BATCH_SIZE));
+    setNotice({
+      tone: rejected.length > 0 ? "warn" : "info",
+      text: `${accepted.length} image${accepted.length === 1 ? "" : "s"} staged for comparison.${rejected.length > 0 ? ` Unsupported files ignored: ${rejected.join(", ")}.` : ""}`
+    });
+    input.value = "";
+  }
+
+  async function compareStagedFiles() {
+    if (pendingImages.length === 0) return;
     setNotice(null);
     setIsProcessing(true);
-    setProgress(null);
+    setProgress({ done: 0, total: pendingImages.length });
     try {
-      // JSON is read first. A file carrying only an `application` object is not a case on
-      // its own - it is the record a label image uploaded beside it is compared against,
-      // so every record has to be in hand before any image is read.
-      const structured: LabelCase[] = [];
-      const applications = new Map<string, { fields: LabelFields; sourceName: string }>();
-
-      for (const file of files.filter(isJsonFile)) {
-        const startedAt = performance.now();
-        try {
-          if (file.size > MAX_UPLOAD_BYTES) {
-            structured.push(timed(makeStubCase(file, "rejected", "File exceeds the 10 MB local-demo limit."), startedAt));
-            continue;
-          }
-          const value = JSON.parse(await file.text());
-          const record = parseApplicationRecord(value);
-          if (record) {
-            applications.set(pairingKey(file.name), { fields: record, sourceName: file.name });
-            continue;
-          }
-          const parsed = parseStructuredCase(value, file.name);
-          structured.push(timed(parsed || makeStubCase(file, "unreadable", "JSON was readable, but it held neither an application/label pair nor an application record."), startedAt));
-        } catch {
-          structured.push(timed(makeStubCase(file, "unreadable", "This file could not be read or parsed. Human review is required."), startedAt));
-        }
-      }
-
-      const images = files.filter((file) => !isJsonFile(file));
+      const applications = new Map(pendingApplications.map((item) => [item.key, item] as const));
       const paired = new Set<string>();
       let done = 0;
-      if (images.length > 0) setProgress({ done: 0, total: images.length });
-
-      const read = await processBatch(images, async (file) => {
+      const read = await processBatch(pendingImages, async (file) => {
         const startedAt = performance.now();
-        // Isolated per file: one unreadable image must not discard the whole batch.
         try {
           if (file.size > MAX_UPLOAD_BYTES) {
             return timed(makeStubCase(file, "rejected", "File exceeds the 10 MB local-demo limit."), startedAt);
           }
-          if (!file.type.startsWith("image/")) {
-            return timed(makeStubCase(file, "rejected", "Unsupported file type. Upload a JSON case or a label image."), startedAt);
-          }
+          const record = applications.get(pairingKey(file.name));
+          if (record) paired.add(record.key);
           const ocr = await recognizeLabel(file);
-          const key = pairingKey(file.name);
-          const record = applications.get(key);
-          if (record) paired.add(key);
-          return timed(
-            makeOcrCase({
-              file,
-              imageUrl: URL.createObjectURL(file),
-              text: ocr.text,
-              confidence: ocr.confidence,
-              label: extractLabelFields(ocr.text),
-              application: record?.fields ?? null,
-              applicationSource: record?.sourceName
-            }),
-            startedAt
-          );
+          return timed(makeOcrCase({
+            file,
+            imageUrl: URL.createObjectURL(file),
+            text: ocr.text,
+            confidence: ocr.confidence,
+            label: extractLabelFields(ocr.text),
+            application: record?.fields ?? null,
+            applicationSource: record?.file.name
+          }), startedAt);
         } catch {
           return timed(makeStubCase(file, "unreadable", "This image could not be read. Human review is required."), startedAt);
         } finally {
           done += 1;
-          setProgress({ done, total: images.length });
+          setProgress({ done, total: pendingImages.length });
         }
       }, DEFAULT_CONCURRENCY);
-
-      const loaded = [...read, ...structured];
-      setCases((current) => [...loaded, ...current]);
-      if (loaded[0]) setSelectedId(loaded[0].id);
-
-      // An application record whose image never arrived would otherwise disappear without
-      // a trace, leaving the agent no way to tell that it was never checked.
-      const orphans = [...applications.entries()].filter(([key]) => !paired.has(key));
+      setCases((current) => [...read, ...current]);
+      if (read[0]) setSelectedId(read[0].id);
+      const orphanApplications = pendingApplications.filter((item) => !paired.has(item.key));
+      const unmatchedImages = read.filter((item) => !item.applicationSource).length;
       const warnings = [
-        skipped > 0
-          ? `${skipped} file${skipped === 1 ? " was" : "s were"} NOT processed - this prototype accepts ${MAX_BATCH_SIZE} files per batch.`
-          : "",
-        orphans.length > 0
-          ? `${orphans.length} application record${orphans.length === 1 ? "" : "s"} (${orphans.map(([, value]) => value.sourceName).join(", ")}) had no label image with a matching filename and ${orphans.length === 1 ? "was" : "were"} not checked.`
-          : ""
+        orphanApplications.length > 0 ? `${orphanApplications.length} application record${orphanApplications.length === 1 ? "" : "s"} had no matching image and were not checked.` : "",
+        unmatchedImages > 0 ? `${unmatchedImages} image${unmatchedImages === 1 ? "" : "s"} had no matching application record and remain review-only.` : ""
       ].filter(Boolean);
-
-      const pairedText = paired.size > 0
-        ? ` ${paired.size} label${paired.size === 1 ? " was" : "s were"} matched to an application record by filename.`
-        : "";
-      const loadedText = `${loaded.length} case${loaded.length === 1 ? "" : "s"} loaded.${pairedText} Everything stays in this browser; no files are sent anywhere.`;
-      setNotice(
-        warnings.length > 0
-          ? { tone: "warn", text: `${loadedText} ${warnings.join(" ")}` }
-          : { tone: "info", text: loadedText }
-      );
+      setNotice({
+        tone: warnings.length > 0 ? "warn" : "info",
+        text: `${read.length} label${read.length === 1 ? "" : "s"} compared. ${paired.size} pair${paired.size === 1 ? "" : "s"} matched by filename.${warnings.length > 0 ? ` ${warnings.join(" ")}` : ""}`
+      });
+      setPendingApplications([]);
+      setPendingImages([]);
     } finally {
       setIsProcessing(false);
       setProgress(null);
-      input.value = "";
     }
   }
 
@@ -220,6 +225,8 @@ export default function App() {
     setCases(fixtureCases);
     setSelectedId(fixtureCases[0].id);
     setReviewed({});
+    setPendingApplications([]);
+    setPendingImages([]);
     // Hands back the ~3 MB language model and the WASM core the OCR worker is holding.
     void terminateOcr();
     setNotice({ tone: "info", text: "Uploaded cases cleared. The sample cases remain." });
@@ -234,7 +241,7 @@ export default function App() {
   function exportQueue() {
     const header = ["Case", "Overall status", "Matches", "Mismatches", "Needs review", "Processing time (ms)", "Review recorded"];
     const rows = cases.map((item) => {
-      const itemSummary = summaries.get(item.id) ?? compareFields(item.application, item.label);
+      const itemSummary = summaries.get(item.id) ?? compareCase(item);
       // A refused file was never compared, so it has no field counts to report.
       const refused = item.ocrStatus === "rejected";
       return [
@@ -289,25 +296,28 @@ export default function App() {
             <span className="count-badge">{cases.length}</span>
           </div>
 
+          <div className="upload-heading">Prepare a batch</div>
           <label className="upload-box">
             <span className="upload-icon" aria-hidden="true">↑</span>
-            <strong>
-              {isProcessing
-                ? progress
-                  ? `Reading labels... ${progress.done} of ${progress.total}`
-                  : "Processing..."
-                : "Upload label images or JSON"}
-            </strong>
-            <span>Images are read on this device · max {MAX_BATCH_SIZE} per batch</span>
-            <input
-              type="file"
-              accept=".json,image/*"
-              multiple
-              onChange={loadFiles}
-              disabled={isProcessing}
-              aria-label="Upload JSON cases or label images"
-            />
+            <strong>Upload application JSON files</strong>
+            <span>Stage records here before comparison</span>
+            <input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" />
           </label>
+          <div className="pending-files">
+            {pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span key={item.key}>{item.file.name}</span>)}
+          </div>
+          <label className="upload-box">
+            <span className="upload-icon" aria-hidden="true">↑</span>
+            <strong>Upload label images</strong>
+            <span>Read locally with OCR · max {MAX_BATCH_SIZE}</span>
+            <input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" />
+          </label>
+          <div className="pending-files">
+            {pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span key={`${file.name}-${file.lastModified}`}>{file.name}</span>)}
+          </div>
+          <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>
+            {isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}
+          </button>
 
           <div className="fixture-label">{cases.length > fixtureCases.length ? "Uploaded and sample cases" : "Sample cases"}</div>
           <nav className="case-list">
@@ -347,7 +357,9 @@ export default function App() {
             <div className="heading-actions">
               <button className="secondary-button" type="button" onClick={exportQueue}>Export CSV</button>
               {cases.length > fixtureCases.length && (
-                <button className="secondary-button" type="button" onClick={clearUploads}>Clear uploads</button>
+                // Disabled mid-batch: terminating the OCR worker strands the jobs still queued
+                // on it, so the batch would never finish and the upload box would stay locked.
+                <button className="secondary-button" type="button" onClick={clearUploads} disabled={isProcessing}>Clear uploads</button>
               )}
               <span className={`overall-chip chip-${refused ? "review" : summary.overall}`}>
                 <span aria-hidden="true">{refused ? "!" : statusIcon(summary.overall)}</span>{" "}

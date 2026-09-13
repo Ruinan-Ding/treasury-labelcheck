@@ -26,7 +26,7 @@ npm run dev
 Open the URL Vite prints (normally `http://localhost:5173`).
 
 ```bash
-npm test         # 52 tests
+npm test         # 57 tests
 npm run build    # type-check and produce dist/
 npm run preview  # serve the production build
 ```
@@ -38,8 +38,9 @@ step, and no network access is needed once `npm install` has finished.
 ## Try it
 
 Three sample labels are in [`public/samples/`](public/samples), each with a matching
-application record. **Select the `.png` and the `.json` of the same name together** and
-the app pairs them:
+application record. Stage the JSON files in the **application** upload box and the
+images in the **label** upload box, then click **Compare uploaded files**. The app
+pairs them by matching base filename:
 
 | Upload | What it demonstrates |
 | --- | --- |
@@ -51,6 +52,12 @@ Upload a label image on its own and it is still read and checked against the sta
 warning — that requirement comes from law, not from the application record.
 
 `sample-case.json` exercises the structured path with no image at all.
+
+The two upload boxes intentionally keep staged application records and label artwork
+separate. Files may be added at different times; comparison starts only when the agent
+clicks the compare button. Matching is case-insensitive and uses the filename before
+the final extension. Unmatched records and images remain explicitly review-only rather
+than being paired by upload order.
 
 ## Approach
 
@@ -101,6 +108,11 @@ is what Sarah Chen said her agents actually need.
 - **Alcohol content** — common notations are normalized (`45% by volume`, `45% Alc./Vol.`,
   `45% ABV`) without converting or inferring any value.
 - **Everything else** — whitespace and case normalization only.
+- **Labels read by OCR** — recognised text cannot tell a misread from a misprint, so a
+  difference in wording is Review, not Mismatch. Only what a misread cannot plausibly
+  produce stays a mismatch: two cleanly read percentages or volumes that disagree, or a
+  warning prefix set mostly in lowercase. A single stray lowercase letter (`WARNiNG`) is
+  treated as a misread.
 - **Missing values** — a blank on either side is Review, never a mismatch. A gap in the
   application is a data-entry problem for an agent, not evidence against the label.
 
@@ -162,6 +174,9 @@ test dependency, and `npm audit` reports no vulnerabilities.
 - **Geometry is not corrected.** A label photographed at an angle or with glare will read
   poorly. Deskew and perspective correction are the natural next step and were out of
   scope here.
+- **A misread digit is still a mismatch.** `750 mL` read as `150 mL` reports Mismatch,
+  because numbers are the one thing the OCR rule trusts. Gating on Tesseract's per-word
+  confidence would catch it.
 - **Brand name is positional.** It is the first line no stronger rule claimed. A label
   with heavy decorative text above the brand could mislead it; the recognised-text panel
   exists partly so an agent can catch that.
@@ -174,13 +189,13 @@ test dependency, and `npm audit` reports no vulnerabilities.
 
 ## Testing
 
-52 tests across five files:
+57 tests across five files:
 
 | File | Covers |
 | --- | --- |
 | `src/lib/verification.test.ts` | Comparison rules: warning validation, alcohol notation, pass/mismatch/review outcomes. |
 | `src/lib/regressions.test.ts` | Edge cases pinned after they were found: statutory wording, dual-unit and comma-grouped volumes, accented brands, locale-invariant folding, blank values, statute-only warning checks, confidence ordering. |
-| `src/lib/extract.test.ts` | OCR field extraction, including the title-case rejection and refusing to read a proof number as a volume. |
+| `src/lib/extract.test.ts` | OCR field extraction, including the title-case rejection and refusing to read a proof number as a volume; misreads captured from the deployed app held for review, while Harbor Mist's real discrepancies still mismatch. |
 | `src/lib/cases.test.ts` | The untrusted-upload boundary: CSV formula escaping, id uniqueness, malformed JSON. |
 | `src/lib/batch.test.ts` | Input-order preservation, the cap, bounded concurrency, error propagation. |
 

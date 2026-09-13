@@ -61,6 +61,11 @@ button { cursor: pointer; }
 .upload-box strong { font-size: 15px; }
 .upload-box span:last-of-type { font-size: 13px; color: #52696a; }
 .upload-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-heading { margin: 18px 0 7px; color: #52696a; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.pending-files { display: flex; flex-direction: column; gap: 4px; margin: 7px 0 10px; color: #52696a; font-size: 12px; }
+.pending-files span { overflow: hidden; padding: 4px 7px; border: 1px solid #d8e4e1; border-radius: 4px; background: #f7faf9; text-overflow: ellipsis; white-space: nowrap; }
+.compare-button { width: 100%; margin: 4px 0 12px; }
+.compare-button:disabled { cursor: not-allowed; opacity: .5; }
 .upload-icon { font-size: 22px; line-height: 1; color: #25866f; }
 .fixture-label { margin: 27px 8px 9px; color: #52696a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
 .case-list { display: flex; flex-direction: column; gap: 3px; scrollbar-gutter: stable; }
@@ -89,6 +94,7 @@ button { cursor: pointer; }
 .heading-actions { gap: 9px; align-self: flex-start; }
 .secondary-button { border: 1px solid #b9d4ce; border-radius: 7px; padding: 8px 12px; background: white; color: #21564f; font-size: 14px; font-weight: 700; }
 .secondary-button:hover { background: #edf7f3; }
+.secondary-button:disabled { background: #f3f5f4; border-color: #d5dedb; color: #5f6f6c; cursor: not-allowed; }
 .overall-chip, .reviewed-chip { border-radius: 99px; padding: 8px 13px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .chip-match, .reviewed-chip { color: #167357; background: #def3e8; }
 .chip-mismatch { color: #aa413b; background: #fce6e3; }
