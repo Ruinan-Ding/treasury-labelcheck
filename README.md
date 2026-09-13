@@ -130,6 +130,15 @@ The core loop in the stakeholder interviews is *an agent looks at the label artw
 checks it against the application*. So the prototype had to actually read a label, not
 ask the agent to transcribe one.
 
+**Where the AI is.** Reading the label is done by a neural network: Tesseract's LSTM
+(long short-term memory) text-recognition model, running on the agent's own machine. A
+multimodal LLM or cloud vision API would read messier photographs, but Marcus Williams
+described a firewall that blocks outbound traffic and a vendor pilot that failed because
+of it, so the model has to run without leaving the network. The AI reads the label;
+deterministic rules decide what the reading means. Every verdict comes with the rule
+and the evidence behind it, which a compliance decision needs and a model's guess
+cannot provide. Where the model may have misread, the case goes to a human.
+
 **Reading the label.** Tesseract compiled to WebAssembly runs in the browser. A cloud OCR
 API was never viable given the firewall. The worker, WASM core, and ~2.9 MB English model
 are served from the app's own origin; `scripts/vendor-ocr.mjs` copies them out of
