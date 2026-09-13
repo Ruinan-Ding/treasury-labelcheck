@@ -74,7 +74,9 @@ files**. This exercises the same OCR and filename-pairing path as a real batch.
 
 The two upload boxes intentionally keep staged application records and label artwork
 separate. Files may be added at different times; comparison starts only when the agent
-clicks the compare button. Matching is case-insensitive and uses the filename before
+clicks the compare button. Individual staged files can be removed with the `x` control,
+and **Reset workspace** clears the current batch and returns to the blank starting state.
+Matching is case-insensitive and uses the filename before
 the final extension. Unmatched records and images remain explicitly review-only rather
 than being paired by upload order.
 

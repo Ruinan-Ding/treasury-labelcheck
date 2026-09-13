@@ -215,7 +215,15 @@ export default function App() {
     setNotice(null);
   }
 
-  function clearUploads() {
+  function removeApplication(key: string) {
+    setPendingApplications((current) => current.filter((item) => item.key !== key));
+  }
+
+  function removeImage(file: File) {
+    setPendingImages((current) => current.filter((item) => item !== file));
+  }
+
+  function resetWorkspace() {
     // Object URLs are never reclaimed on their own. Revoked here rather than inside the
     // state updater, which React requires to be pure and invokes twice in StrictMode.
     cases.forEach((item) => {
@@ -228,7 +236,7 @@ export default function App() {
     setPendingImages([]);
     // Hands back the ~3 MB language model and the WASM core the OCR worker is holding.
     void terminateOcr();
-    setNotice({ tone: "info", text: "Uploaded cases cleared." });
+    setNotice({ tone: "info", text: "Workspace reset." });
   }
 
   function markReviewed() {
@@ -277,10 +285,11 @@ export default function App() {
           <div className="sidebar-heading"><div><p className="eyebrow">Verification queue</p><h2>Cases</h2></div><span className="count-badge">0</span></div>
           <div className="upload-heading">Prepare a batch</div>
           <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload application JSON files</strong><span>Stage records here before comparison</span><input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" /></label>
-          <div className="pending-files">{pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span key={item.key}>{item.file.name}</span>)}</div>
+          <div className="pending-files">{pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.key}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(item.key)} aria-label={`Remove ${item.file.name}`}>x</button></span>)}</div>
           <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload label images</strong><span>Read locally with OCR · max {MAX_BATCH_SIZE}</span><input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" /></label>
-          <div className="pending-files">{pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span key={`${file.name}-${file.lastModified}`}>{file.name}</span>)}</div>
+          <div className="pending-files">{pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span className="pending-file" key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button type="button" onClick={() => removeImage(file)} aria-label={`Remove ${file.name}`}>x</button></span>)}</div>
           <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>{isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}</button>
+          {(pendingApplications.length > 0 || pendingImages.length > 0) && <button className="reset-button" type="button" onClick={resetWorkspace} disabled={isProcessing}>Reset workspace</button>}
           <div className="sidebar-footnote"><strong>Bounded batch processing</strong><span>Up to {MAX_BATCH_SIZE} items, {DEFAULT_CONCURRENCY} in-process workers.</span></div>
         </aside>
         <main className="content empty-state"><div className="empty-card"><p className="eyebrow">Ready for review</p><h2>Start with a real batch</h2><p>Stage application JSON files and label images in the two upload boxes, then compare them. Nothing is preloaded.</p></div></main>
@@ -326,7 +335,7 @@ export default function App() {
             <input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" />
           </label>
           <div className="pending-files">
-            {pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span key={item.key}>{item.file.name}</span>)}
+            {pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.key}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(item.key)} aria-label={`Remove ${item.file.name}`}>x</button></span>)}
           </div>
           <label className="upload-box">
             <span className="upload-icon" aria-hidden="true">↑</span>
@@ -335,11 +344,12 @@ export default function App() {
             <input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" />
           </label>
           <div className="pending-files">
-            {pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span key={`${file.name}-${file.lastModified}`}>{file.name}</span>)}
+            {pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span className="pending-file" key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button type="button" onClick={() => removeImage(file)} aria-label={`Remove ${file.name}`}>x</button></span>)}
           </div>
           <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>
             {isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}
           </button>
+          {(pendingApplications.length > 0 || pendingImages.length > 0) && <button className="reset-button" type="button" onClick={resetWorkspace} disabled={isProcessing}>Reset workspace</button>}
 
           <div className="fixture-label">Verification cases</div>
           <nav className="case-list">
@@ -381,7 +391,7 @@ export default function App() {
               {cases.length > 0 && (
                 // Disabled mid-batch: terminating the OCR worker strands the jobs still queued
                 // on it, so the batch would never finish and the upload box would stay locked.
-                <button className="secondary-button" type="button" onClick={clearUploads} disabled={isProcessing}>Clear uploads</button>
+                <button className="reset-button" type="button" onClick={resetWorkspace} disabled={isProcessing}>Reset workspace</button>
               )}
               <span className={`overall-chip chip-${refused ? "review" : summary.overall}`}>
                 <span aria-hidden="true">{refused ? "!" : statusIcon(summary.overall)}</span>{" "}

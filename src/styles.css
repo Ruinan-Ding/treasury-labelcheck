@@ -64,8 +64,15 @@ button { cursor: pointer; }
 .upload-heading { margin: 18px 0 7px; color: #52696a; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .pending-files { display: flex; flex-direction: column; gap: 4px; margin: 7px 0 10px; color: #52696a; font-size: 12px; }
 .pending-files span { overflow: hidden; padding: 4px 7px; border: 1px solid #d8e4e1; border-radius: 4px; background: #f7faf9; text-overflow: ellipsis; white-space: nowrap; }
+.pending-files .pending-file { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 7px; }
+.pending-file > span { min-width: 0; overflow: hidden; padding: 4px 0; border: 0; background: transparent; text-overflow: ellipsis; }
+.pending-file button { flex: 0 0 auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #8a4a45; font-weight: 700; line-height: 1; }
+.pending-file button:hover { background: #fce6e3; color: #a7372f; }
 .compare-button { width: 100%; margin: 4px 0 12px; }
 .compare-button:disabled { cursor: not-allowed; opacity: .5; }
+.reset-button { width: 100%; border: 1px solid #b84a42; border-radius: 7px; padding: 8px 12px; background: #c6534b; color: white; font-size: 14px; font-weight: 700; }
+.reset-button:hover { background: #a93e37; }
+.reset-button:disabled { cursor: not-allowed; opacity: .5; }
 .empty-state { display: grid; place-items: center; min-height: 55vh; }
 .empty-card { max-width: 560px; padding: 42px; border: 1px solid #dce9e6; border-radius: 14px; background: #fff; box-shadow: 0 12px 30px rgba(24,49,58,.06); }
 .empty-card h2 { margin: 5px 0 12px; color: #18313a; font-size: 30px; letter-spacing: -.04em; }
@@ -96,6 +103,7 @@ button { cursor: pointer; }
 .page-heading h2 { font-size: clamp(24px, 3vw, 34px); }
 .subheading { margin: 7px 0 0; color: #566d70; font-size: 15px; }
 .heading-actions { gap: 9px; align-self: flex-start; }
+.heading-actions .reset-button { width: auto; }
 .secondary-button { border: 1px solid #b9d4ce; border-radius: 7px; padding: 8px 12px; background: white; color: #21564f; font-size: 14px; font-weight: 700; }
 .secondary-button:hover { background: #edf7f3; }
 .secondary-button:disabled { background: #f3f5f4; border-color: #d5dedb; color: #5f6f6c; cursor: not-allowed; }
