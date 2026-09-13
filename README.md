@@ -104,8 +104,11 @@ can be changed, and its green, yellow, or red indicator appears beside the case 
 the verification queue. This decision is distinct from the automated comparison
 status and is included in the local CSV export.
 
-The CSV includes the complete case summary plus each required field's application
-value, label evidence, status, match tier, and confidence. Paired cases use the
+The CSV includes the complete textual case record: case ID, source files, description,
+input/pairing status, OCR confidence and recognized text, warning-presentation metadata,
+the complete case summary, and each required field's application value, label evidence,
+status, match tier, confidence, and explanatory note. The uploaded image itself remains
+in the browser queue rather than being embedded in the text export. Paired cases use the
 filename stem as the case name; unmatched files retain their `.json` or image
 extension so the missing pairing is visible. If the same Case name appears more
 than once, the export suffixes later rows with `(2)`, `(3)`, and so on.
@@ -124,8 +127,9 @@ CSV column meanings:
   an application-only case was created without OCR.
 - **Human decision** is the agent's separate `Accept`, `Needs review`, or `Reject`
   choice. It does not overwrite the automated result.
-- Each field has five columns: application value, label evidence, field status,
-  match tier (`exact`, `normalized`, `mismatch`, or `review`), and confidence.
+- Each field has six columns: application value, label evidence, field status,
+  match tier (`exact`, `normalized`, `mismatch`, or `review`), confidence, and the
+  rule explanation.
   Rejected files leave these field columns blank because no comparison ran.
 
 Queue icons have the same meanings: `✓` is an automated match, `!` is a confirmed

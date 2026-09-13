@@ -296,14 +296,21 @@ export default function App() {
       `${label} - Label evidence`,
       `${label} - Status`,
       `${label} - Tier`,
-      `${label} - Confidence`
+      `${label} - Confidence`,
+      `${label} - Note`
     ]);
     const header = [
       "Case",
+      "Case ID",
       "Source file",
+      "Application source",
       "Description",
       "Input status",
       "Pairing status",
+      "OCR confidence",
+      "Recognized text",
+      "Label warning prefix all caps",
+      "Label warning bold",
       "Overall status",
       "Matches",
       "Mismatches",
@@ -317,18 +324,24 @@ export default function App() {
       const itemSummary = summaries.get(item.id) ?? compareCase(item);
       // A refused file was never compared, so it has no field counts to report.
       const refused = item.ocrStatus === "rejected";
-      const fieldValues = refused ? FIELD_DEFINITIONS.flatMap(() => ["", "", "", "", ""]) : FIELD_DEFINITIONS.flatMap(({ key }) => {
+      const fieldValues = refused ? FIELD_DEFINITIONS.flatMap(() => ["", "", "", "", "", ""]) : FIELD_DEFINITIONS.flatMap(({ key }) => {
         const result = itemSummary.results.find((candidate) => candidate.key === key);
         return result
-          ? [result.applicationValue ?? "", result.labelValue ?? "", result.status, result.matchTier, `${Math.round(result.confidence * 100)}%`]
-          : ["", "", "", "", ""];
+          ? [result.applicationValue ?? "", result.labelValue ?? "", result.status, result.matchTier, `${Math.round(result.confidence * 100)}%`, result.note]
+          : ["", "", "", "", "", ""];
       });
       return [
         exportCaseName(item, caseOccurrences),
+        item.id,
         item.sourceName ?? item.name,
+        item.applicationSource ?? "",
         item.description,
         inputStatusLabel(item.ocrStatus),
         item.pairingStatus === "unmatched" ? "Unmatched" : item.pairingStatus === "matched" ? "Matched" : "Not applicable",
+        item.ocrConfidence === undefined ? "" : `${Math.round(item.ocrConfidence * 100)}%`,
+        item.ocrText ?? "",
+        item.label.warningPrefixAllCaps === undefined ? "" : item.label.warningPrefixAllCaps ? "Yes" : "No",
+        item.label.warningBold === undefined ? "" : item.label.warningBold ? "Yes" : "No",
         refused ? "Not processed" : statusLabel(itemSummary.overall),
         refused ? "" : itemSummary.matched,
         refused ? "" : itemSummary.mismatched,
