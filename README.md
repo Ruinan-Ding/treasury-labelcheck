@@ -61,9 +61,9 @@ Additional paired cases cover:
 
 Unpaired inputs are included deliberately:
 
-- `unmatched-application.json` and `unmatched-application-2.json` — application
+- `application-only-a.json` and `application-only-b.json` — application
   records with no corresponding image.
-- `unmatched-label.png` and `unmatched-label-2.png` — label images with no
+- `label-only-a.png` and `label-only-b.png` — label images with no
   corresponding application record.
 
 The directory contains 13 paired JSON/PNG cases plus two JSON-only and two
