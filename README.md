@@ -37,16 +37,30 @@ step, and no network access is needed once `npm install` has finished.
 
 ## Try it
 
-Three sample labels are in [`public/samples/`](public/samples), each with a matching
-application record. Stage the JSON files in the **application** upload box and the
-images in the **label** upload box, then click **Compare uploaded files**. The app
-pairs them by matching base filename:
+The [`public/samples/`](public/samples) directory contains a synthetic, copyright-safe
+batch of paired PNG label artworks and application JSON records. Stage the JSON files
+in the **application** upload box and the images in the **label** upload box, then
+click **Compare uploaded files**. The app pairs them by matching base filename:
 
 | Upload | What it demonstrates |
 | --- | --- |
 | `old-tom.png` + `old-tom.json` | A clean pass. Six fields verify; the warning is held for a human because bold cannot be proven from an image. |
 | `stones-throw.png` + `stones-throw.json` | Dave Morrison's judgment case: the label says `STONE'S THROW`, the application says `Stone's Throw`. Reported as a **normalized match**, not a mismatch. |
 | `harbor-mist.png` + `harbor-mist.json` | Jenny Park's rejection case: correct warning wording in title case is a **mismatch**, alongside a genuine ABV and volume discrepancy. |
+
+Additional paired cases cover:
+
+- `abv-mismatch` — a numeric alcohol-content discrepancy.
+- `volume-mismatch` — a net-content discrepancy.
+- `warning-titlecase` and `warning-punctuation` — strict warning failures.
+- `normalized-units` and `fluid-ounce-volume` — equivalent labels and explicit volume units.
+- `import-origin` — imported-product origin and producer fields.
+- `missing-fields` — an unavailable country-of-origin field held for review.
+- `low-contrast-review` — a deliberately degraded but readable image.
+- `unreadable-review` — a noisy image that should remain review-only.
+
+These are demo inputs, not additional Treasury requirements. They make the
+important decision paths reproducible without external image downloads.
 
 Upload a label image on its own and it is still read and checked against the statutory
 warning — that requirement comes from law, not from the application record.
