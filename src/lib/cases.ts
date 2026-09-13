@@ -23,11 +23,12 @@ export function csvCell(value: string | number): string {
 
 // Date.now() has 1 ms resolution and the batch schedules several jobs, so a counter is
 // what actually keeps these unique. Ids are ours alone: one supplied by an uploaded JSON
-// could collide with a fixture or with a second upload of the same file.
+// could collide with a fixture or with a second upload of the same file. The timestamp
+// keeps ids from a restored workspace apart from ones minted after the refresh.
 let caseSequence = 0;
 export function nextCaseId(prefix: string): string {
   caseSequence += 1;
-  return `${prefix}-${caseSequence}`;
+  return `${prefix}-${Date.now()}-${caseSequence}`;
 }
 
 function asFieldValue(value: unknown): string | null {
@@ -111,6 +112,7 @@ export function makeOcrCase(input: OcrCaseInput): LabelCase {
     application: input.application ?? emptyLabel,
     label: input.label,
     imageUrl: input.imageUrl,
+    imageFile: input.file,
     ocrStatus: readAnything ? "ocr" : "unreadable",
     sourceName: input.file.name,
     ocrConfidence: input.confidence,

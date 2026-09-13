@@ -211,7 +211,7 @@ is a transparent rule-based signal, **not** a calibrated model probability.
 | Usable by a 73-year-old; half the team is 50+ (Sarah) | Every text colour meets WCAG AA contrast, body and comparison text is at least 11px, status is carried by text and glyph as well as colour, every control has a visible focus ring, and the batch reports progress instead of going quiet. |
 | Batch of 200–300 (Sarah, Janet) | Cap is 300, above the largest batch described. Three jobs are scheduled with preserved input order while the reused OCR worker processes image recognition safely, and one bad file never discards the batch. |
 | No cloud APIs; firewall blocks egress (Marcus) | Zero outbound requests after page load. OCR assets are same-origin. |
-| No PII, no COLA integration (Marcus) | No persistence, no network, no credentials. Object URLs are released when the queue is cleared. |
+| No PII, no COLA integration (Marcus) | No server, no network, no credentials. The workspace is kept only in the agent's own browser (IndexedDB) so a refresh does not lose a batch, and Reset workspace erases it. Object URLs are released when the queue is cleared. |
 | Judgment, not blind pattern matching (Dave) | Normalization tiers separate an exact verify from a harmless formatting difference, and anything uncertain is handed to the agent rather than auto-decided. |
 | Warning exact, all-caps and bold (Jenny) | Verbatim statutory comparison plus a separate capitalization check. Bold is treated as unprovable from an image — see below. |
 | Imperfect images (Jenny) | Grayscale plus a contrast stretch recovers text from flatly under- or over-exposed photographs. Skew, perspective, and glare are not corrected. |
@@ -266,8 +266,11 @@ test dependency, and `npm audit` reports no vulnerabilities.
   background job, not an interactive wait. A worker pool sized to `hardwareConcurrency`
   would be the first optimization if throughput mattered.
 - **English only**, and no COLA integration — Marcus explicitly scoped that out.
-- **Nothing persists.** Reload and the queue is empty. Real use would need a review
-  record, which brings the retention and PII questions Marcus flagged.
+- **Persistence is per browser.** The queue, staged files, selection, and decisions
+  survive a refresh, but they live in one browser on one machine until Reset workspace.
+  If two tabs are open, the last one to save wins. A batch interrupted by a refresh is
+  not resumed; its files stay staged, so Compare can simply be run again. Real use would
+  need a shared review record, which brings the retention and PII questions Marcus flagged.
 
 ## Testing
 

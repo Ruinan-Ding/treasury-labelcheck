@@ -1,4 +1,4 @@
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { DEFAULT_CONCURRENCY, MAX_BATCH_SIZE, processBatch } from "./lib/batch";
 import { compareFields, FIELD_DEFINITIONS } from "./lib/verification";
 import { extractLabelFields } from "./lib/extract";
@@ -13,6 +13,7 @@ import {
   parseApplicationRecord,
   parseStructuredCase
 } from "./lib/cases";
+import { loadWorkspace, saveWorkspace } from "./lib/workspace-store";
 import type { LabelCase, LabelFields, OcrStatus, VerificationStatus } from "./types";
 
 interface Notice {
@@ -29,6 +30,22 @@ interface PendingApplication {
 
 type HumanDecision = "accept" | "review" | "reject";
 let stagedApplicationSequence = 0;
+
+// Saved as two records so selecting a case or recording a decision does not rewrite
+// every stored image.
+interface SavedQueue {
+  version: number;
+  cases: LabelCase[];
+  pendingApplications: PendingApplication[];
+  pendingImages: File[];
+}
+
+interface SavedView {
+  version: number;
+  selectedId: string | null;
+  decisions: Record<string, HumanDecision>;
+  notice: Notice | null;
+}
 
 function statusLabel(status: VerificationStatus): string {
   return status === "match" ? "Match" : status === "mismatch" ? "Mismatch" : "Review";
@@ -112,6 +129,42 @@ export default function App() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [storage, setStorage] = useState<"loading" | "ready" | "unavailable">("loading");
+
+  useEffect(() => {
+    Promise.all([loadWorkspace<SavedQueue>("queue"), loadWorkspace<SavedView>("view")])
+      .then(([queue, view]) => {
+        if (queue) {
+          // Object URLs die with the page, so previews are recreated from the stored files.
+          setCases(queue.cases.map((item) => (item.imageFile ? { ...item, imageUrl: URL.createObjectURL(item.imageFile) } : item)));
+          setPendingApplications(queue.pendingApplications);
+          setPendingImages(queue.pendingImages);
+          stagedApplicationSequence = Math.max(stagedApplicationSequence, ...queue.pendingApplications.map((item) => item.id));
+        }
+        if (view) {
+          setSelectedId(view.selectedId);
+          setDecisions(view.decisions);
+          setNotice(view.notice);
+        }
+        setStorage("ready");
+      })
+      .catch(() => {
+        setStorage("unavailable");
+        setNotice({ tone: "warn", text: "This browser is not allowing local storage, so refreshing the page will clear the workspace." });
+      });
+  }, []);
+
+  // ponytail: the last tab to save wins; give each tab its own record if agents work in several at once.
+  useEffect(() => {
+    if (storage !== "ready") return;
+    saveWorkspace("queue", { cases, pendingApplications, pendingImages }).catch(() =>
+      setNotice({ tone: "warn", text: "The workspace could not be saved in this browser, so refreshing the page may lose recent work." })
+    );
+  }, [storage, cases, pendingApplications, pendingImages]);
+
+  useEffect(() => {
+    if (storage === "ready") saveWorkspace("view", { selectedId, decisions, notice }).catch(() => undefined);
+  }, [storage, selectedId, decisions, notice]);
 
   const selected = cases.find((item) => item.id === selectedId) || cases[0];
   const displayNames = useMemo(() => {
@@ -287,7 +340,7 @@ export default function App() {
   function setDecision(decision: HumanDecision) {
     if (!selected) return;
     setDecisions((current) => ({ ...current, [selected.id]: decision }));
-    setNotice({ tone: "info", text: `${decision === "accept" ? "Accepted" : decision === "reject" ? "Rejected" : "Marked as needing review"} for this session. You can change this decision at any time.` });
+    setNotice({ tone: "info", text: `${decision === "accept" ? "Accepted" : decision === "reject" ? "Rejected" : "Marked as needing review"}. You can change this decision at any time.` });
   }
 
   function exportQueue() {
@@ -360,6 +413,9 @@ export default function App() {
     URL.revokeObjectURL(url);
     setNotice({ tone: "info", text: "Review queue exported locally. No files or results were sent anywhere." });
   }
+
+  // Rendering before the saved workspace is read would flash the empty state on refresh.
+  if (storage === "loading") return null;
 
   if (!selected || !summary) return (
     <div className="app-shell">

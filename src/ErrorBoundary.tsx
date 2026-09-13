@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from "react";
+import { clearWorkspace } from "./lib/workspace-store";
 
 interface Props {
   children: ReactNode;
@@ -29,11 +30,16 @@ export default class ErrorBoundary extends Component<Props, State> {
         <h1>Something went wrong displaying this case</h1>
         <p>
           No verification result is shown, so nothing here should be treated as a compliance decision.
-          Reload the page to return to the sample cases, then re-upload the file that triggered this.
+          Clear the workspace to start again, then re-upload the files that triggered this.
         </p>
         <p className="error-detail">{this.state.message}</p>
-        <button className="secondary-button" type="button" onClick={() => window.location.reload()}>
-          Reload
+        {/* A plain reload would restore the saved workspace that failed to render. */}
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => void clearWorkspace().finally(() => window.location.reload())}
+        >
+          Clear workspace and reload
         </button>
       </main>
     );

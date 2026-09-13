@@ -31,6 +31,8 @@ export interface LabelCase {
   application: LabelFields;
   label: LabelFields;
   imageUrl?: string;
+  /** The uploaded image itself, kept so `imageUrl` can be recreated after a refresh. */
+  imageFile?: Blob;
   ocrStatus: OcrStatus;
   sourceName?: string;
   processingTimeMs?: number;
