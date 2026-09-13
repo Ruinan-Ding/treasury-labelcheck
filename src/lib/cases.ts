@@ -21,9 +21,9 @@ export function csvCell(value: string | number): string {
   return `"${guarded.replace(/"/g, '""')}"`;
 }
 
-// Date.now() has 1 ms resolution and the batch runs three workers concurrently, so a
-// counter is what actually keeps these unique. Ids are ours alone: one supplied by
-// uploaded JSON could collide with a fixture or with a second upload of the same file.
+// Date.now() has 1 ms resolution and the batch schedules several jobs, so a counter is
+// what actually keeps these unique. Ids are ours alone: one supplied by an uploaded JSON
+// could collide with a fixture or with a second upload of the same file.
 let caseSequence = 0;
 export function nextCaseId(prefix: string): string {
   caseSequence += 1;

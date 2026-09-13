@@ -110,6 +110,29 @@ filename stem as the case name; unmatched files retain their `.json` or image
 extension so the missing pairing is visible. If the same Case name appears more
 than once, the export suffixes later rows with `(2)`, `(3)`, and so on.
 
+CSV column meanings:
+
+- **Case / Source file / Description** identify the queue item and the evidence used.
+- **Input status** says whether the item was a structured record, OCR label, unreadable
+  input, or rejected file.
+- **Pairing status** is `Matched`, `Unmatched`, or `Not applicable` for structured
+  records.
+- **Overall status** is the automated result: `Match`, `Mismatch`, `Review`, or
+  `Not processed`. `Matches`, `Mismatches`, and `Needs review` count the seven
+  required fields.
+- **Processing time (ms)** is the local elapsed time for the item; it is blank when
+  an application-only case was created without OCR.
+- **Human decision** is the agent's separate `Accept`, `Needs review`, or `Reject`
+  choice. It does not overwrite the automated result.
+- Each field has five columns: application value, label evidence, field status,
+  match tier (`exact`, `normalized`, `mismatch`, or `review`), and confidence.
+  Rejected files leave these field columns blank because no comparison ran.
+
+Queue icons have the same meanings: `✓` is an automated match, `!` is a confirmed
+comparison mismatch, `?` means evidence needs review, and `↔` means the JSON and
+image did not pair. A small green, yellow, or red dot beside a case records the
+agent's human decision.
+
 ## Approach
 
 The core loop the stakeholder interviews describe is: *an agent looks at the label
@@ -178,7 +201,7 @@ is a transparent rule-based signal, **not** a calibrated model probability.
 | --- | --- |
 | Results in ~5 seconds (Sarah) | 1.0–2.3 s per label measured end to end, including field extraction. Each case reports its own time. The OCR worker is created once and reused, so the model load is paid once per session rather than per label. |
 | Usable by a 73-year-old; half the team is 50+ (Sarah) | Every text colour meets WCAG AA contrast, body and comparison text is at least 11px, status is carried by text and glyph as well as colour, every control has a visible focus ring, and the batch reports progress instead of going quiet. |
-| Batch of 200–300 (Sarah, Janet) | Cap is 300, above the largest batch described. Three workers run concurrently, input order is preserved, and one bad file never discards the batch. |
+| Batch of 200–300 (Sarah, Janet) | Cap is 300, above the largest batch described. Three jobs are scheduled with preserved input order while the reused OCR worker processes image recognition safely, and one bad file never discards the batch. |
 | No cloud APIs; firewall blocks egress (Marcus) | Zero outbound requests after page load. OCR assets are same-origin. |
 | No PII, no COLA integration (Marcus) | No persistence, no network, no credentials. Object URLs are released when the queue is cleared. |
 | Judgment, not blind pattern matching (Dave) | Normalization tiers separate an exact verify from a harmless formatting difference, and anything uncertain is handed to the agent rather than auto-decided. |
