@@ -96,7 +96,8 @@ status and is included in the local CSV export.
 The CSV includes the complete case summary plus each required field's application
 value, label evidence, status, match tier, and confidence. Paired cases use the
 filename stem as the case name; unmatched files retain their `.json` or image
-extension so the missing pairing is visible.
+extension so the missing pairing is visible. If the same Case name appears more
+than once, the export suffixes later rows with `(2)`, `(3)`, and so on.
 
 ## Approach
 

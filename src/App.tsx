@@ -50,8 +50,11 @@ function inputStatusLabel(status: OcrStatus): string {
         : "Unreadable input";
 }
 
-function exportCaseName(item: LabelCase): string {
-  return item.pairingStatus === "unmatched" ? item.name : item.name.replace(/\.[^.]+$/, "");
+function exportCaseName(item: LabelCase, occurrences: Map<string, number>): string {
+  const baseName = item.pairingStatus === "unmatched" ? item.name : item.name.replace(/\.[^.]+$/, "");
+  const occurrence = (occurrences.get(baseName) ?? 0) + 1;
+  occurrences.set(baseName, occurrence);
+  return occurrence === 1 ? baseName : `${baseName} (${occurrence})`;
 }
 
 const compareCase = (item: LabelCase) =>
@@ -281,6 +284,7 @@ export default function App() {
       "Human decision",
       ...fieldColumns
     ];
+    const caseOccurrences = new Map<string, number>();
     const rows = cases.map((item) => {
       const itemSummary = summaries.get(item.id) ?? compareCase(item);
       // A refused file was never compared, so it has no field counts to report.
@@ -292,7 +296,7 @@ export default function App() {
           : ["", "", "", "", ""];
       });
       return [
-        exportCaseName(item),
+        exportCaseName(item, caseOccurrences),
         item.sourceName ?? item.name,
         item.description,
         inputStatusLabel(item.ocrStatus),
