@@ -40,6 +40,8 @@ export interface LabelCase {
   ocrText?: string;
   /** File the application record was paired from, when an image was matched to one. */
   applicationSource?: string;
+  /** Whether the uploaded JSON and image could be associated by filename. */
+  pairingStatus?: "matched" | "unmatched";
 }
 
 export interface FieldResult {

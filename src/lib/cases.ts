@@ -115,18 +115,40 @@ export function makeOcrCase(input: OcrCaseInput): LabelCase {
     sourceName: input.file.name,
     ocrConfidence: input.confidence,
     ocrText: input.text,
-    applicationSource: input.applicationSource
+    applicationSource: input.applicationSource,
+    pairingStatus: input.applicationSource ? "matched" : "unmatched"
   };
 }
 
-export function makeStubCase(file: File, ocrStatus: OcrStatus, description: string): LabelCase {
+export function makeApplicationOnlyCase(file: File, application: LabelFields): LabelCase {
+  return {
+    id: nextCaseId("application"),
+    name: file.name,
+    description: "Application record parsed, but no matching label image was uploaded. Human review is required.",
+    application,
+    label: emptyLabel,
+    ocrStatus: "unreadable",
+    sourceName: file.name,
+    pairingStatus: "unmatched"
+  };
+}
+
+export function makeStubCase(
+  file: File,
+  ocrStatus: OcrStatus,
+  description: string,
+  application: LabelFields = emptyLabel,
+  applicationSource?: string
+): LabelCase {
   return {
     id: nextCaseId(ocrStatus),
     name: file.name,
     description,
-    application: emptyLabel,
+    application,
     label: emptyLabel,
     ocrStatus,
-    sourceName: file.name
+    sourceName: file.name,
+    applicationSource,
+    pairingStatus: applicationSource ? "matched" : "unmatched"
   };
 }

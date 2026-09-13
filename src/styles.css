@@ -62,7 +62,7 @@ button { cursor: pointer; }
 .upload-box span:last-of-type { font-size: 13px; color: #52696a; }
 .upload-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .upload-heading { margin: 18px 0 7px; color: #52696a; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.pending-files { display: flex; flex-direction: column; gap: 4px; margin: 7px 0 10px; color: #52696a; font-size: 12px; }
+.pending-files { display: flex; flex-direction: column; gap: 4px; max-height: 128px; margin: 7px 0 10px; overflow-y: auto; color: #52696a; font-size: 12px; }
 .pending-files span { overflow: hidden; padding: 4px 7px; border: 1px solid #d8e4e1; border-radius: 4px; background: #f7faf9; text-overflow: ellipsis; white-space: nowrap; }
 .pending-files .pending-file { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 7px; }
 .pending-file > span { min-width: 0; overflow: hidden; padding: 4px 0; border: 0; background: transparent; text-overflow: ellipsis; }

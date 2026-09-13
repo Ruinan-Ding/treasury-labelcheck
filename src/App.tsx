@@ -5,6 +5,7 @@ import { extractLabelFields } from "./lib/extract";
 import { recognizeLabel, terminateOcr } from "./lib/ocr";
 import {
   csvCell,
+  makeApplicationOnlyCase,
   makeOcrCase,
   makeStubCase,
   MAX_UPLOAD_BYTES,
@@ -167,11 +168,11 @@ export default function App() {
       let done = 0;
       const read = await processBatch(pendingImages, async (file) => {
         const startedAt = performance.now();
+        const record = applications.get(pairingKey(file.name));
         try {
           if (file.size > MAX_UPLOAD_BYTES) {
             return timed(makeStubCase(file, "rejected", "File exceeds the 10 MB local-demo limit."), startedAt);
           }
-          const record = applications.get(pairingKey(file.name));
           if (record) paired.add(record.key);
           const ocr = await recognizeLabel(file);
           return timed(makeOcrCase({
@@ -184,20 +185,27 @@ export default function App() {
             applicationSource: record?.file.name
           }), startedAt);
         } catch {
-          return timed(makeStubCase(file, "unreadable", "This image could not be read. Human review is required."), startedAt);
+          return timed(makeStubCase(
+            file,
+            "unreadable",
+            "This image could not be read. Human review is required.",
+            record?.fields,
+            record?.file.name
+          ), startedAt);
         } finally {
           done += 1;
           setProgress({ done, total: pendingImages.length });
         }
       }, DEFAULT_CONCURRENCY);
-      setCases((current) => [...read, ...current]);
-      if (read[0]) setSelectedId(read[0].id);
       const orphanApplications = pendingApplications.filter((item) => !paired.has(item.key));
+      const orphanCases = orphanApplications.map((item) => makeApplicationOnlyCase(item.file, item.fields));
       const unmatchedImages = read.filter((item) => !item.applicationSource).length;
       const warnings = [
         orphanApplications.length > 0 ? `${orphanApplications.length} application record${orphanApplications.length === 1 ? "" : "s"} had no matching image and were not checked.` : "",
         unmatchedImages > 0 ? `${unmatchedImages} image${unmatchedImages === 1 ? "" : "s"} had no matching application record and remain review-only.` : ""
       ].filter(Boolean);
+      setCases((current) => [...read, ...orphanCases, ...current]);
+      if (read[0] || orphanCases[0]) setSelectedId((read[0] || orphanCases[0]).id);
       setNotice({
         tone: warnings.length > 0 ? "warn" : "info",
         text: `${read.length} label${read.length === 1 ? "" : "s"} compared. ${paired.size} pair${paired.size === 1 ? "" : "s"} matched by filename.${warnings.length > 0 ? ` ${warnings.join(" ")}` : ""}`
@@ -362,8 +370,8 @@ export default function App() {
                   aria-current={item.id === selected.id ? "true" : undefined}
                   onClick={() => selectCase(item.id)}
                 >
-                  <span className={`mini-status mini-${overall}`} aria-hidden="true">{statusIcon(overall)}</span>
-                  <span className="visually-hidden">{statusLabel(overall)}: </span>
+                  <span className={`mini-status mini-${item.pairingStatus === "unmatched" ? "mismatch" : overall}`} aria-hidden="true">{item.pairingStatus === "unmatched" ? "!" : statusIcon(overall)}</span>
+                  <span className="visually-hidden">{item.pairingStatus === "unmatched" ? "Unmatched file: " : `${statusLabel(overall)}: `}</span>
                   <span className="case-button-text">
                     <strong>{item.name}</strong>
                     <small>{item.sourceName && item.sourceName !== item.name ? item.sourceName : item.description}</small>
