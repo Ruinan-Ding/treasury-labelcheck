@@ -82,3 +82,45 @@ describe("extractLabelFields", () => {
     expect(summary.matched).toBe(7);
   });
 });
+
+describe("comparing a label read by OCR", () => {
+  const application = {
+    brandName: "Old Tom Distillery",
+    classType: "Kentucky Straight Bourbon Whiskey",
+    alcoholContent: "45% Alc./Vol. (90 Proof)",
+    netContents: "750 mL",
+    bottlerProducer: "Old Tom Distillery, Frankfort, KY",
+    countryOfOrigin: "United States",
+    governmentWarning: STANDARD_WARNING
+  };
+  const status = (text: string, key: string) =>
+    compareFields(application, extractLabelFields(text), { ocr: true }).results.find((r) => r.key === key)!.status;
+
+  // Each misread below was produced by the deployed app from a degraded copy of old-tom.png.
+  it("holds a misread warning for review instead of rejecting a compliant label", () => {
+    expect(status(LABEL_TEXT.replace("birth", "bith"), "governmentWarning")).toBe("review");
+    expect(status(LABEL_TEXT.replace("WARNING:", "WARNiNG:"), "governmentWarning")).toBe("review");
+  });
+
+  it("holds a stray line picked up as the brand for review", () => {
+    expect(status(LABEL_TEXT.replace("OLD TOM DISTILLERY\n", "ee,\n"), "brandName")).toBe("review");
+  });
+
+  it("holds noisy ABV notation for review when the percentage itself agrees", () => {
+    expect(status(LABEL_TEXT.replace("Alc./Vol.", "Ale./\\Vol."), "alcoholContent")).toBe("review");
+  });
+
+  it("still rejects what a misread cannot produce - Harbor Mist's discrepancies", () => {
+    const harborMist = LABEL_TEXT.replace("45% Alc./Vol. (90 Proof)", "40% Alc./Vol. (80 Proof)")
+      .replace("750 mL", "1L")
+      .replace("GOVERNMENT WARNING:", "Government Warning:");
+    expect(status(harborMist, "alcoholContent")).toBe("mismatch");
+    expect(status(harborMist, "netContents")).toBe("mismatch");
+    expect(status(harborMist, "governmentWarning")).toBe("mismatch");
+  });
+
+  it("leaves structured input judged as strictly as before", () => {
+    const label = { ...extractLabelFields(LABEL_TEXT.replace("OLD TOM DISTILLERY\n", "ee,\n")), warningBold: true };
+    expect(compareFields(application, label).results[0].status).toBe("mismatch");
+  });
+});

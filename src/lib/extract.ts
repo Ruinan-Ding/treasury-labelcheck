@@ -43,9 +43,9 @@ function meaningfulLines(text: string): string[] {
     .filter((line) => line.length > 1 && /[A-Za-z0-9]/.test(line));
 }
 
-function extractWarning(text: string): { value: string | null; allCaps: boolean } {
+function extractWarning(text: string): { value: string | null; allCaps: boolean | null } {
   const start = text.search(WARNING_PREFIX);
-  if (start === -1) return { value: null, allCaps: false };
+  if (start === -1) return { value: null, allCaps: null };
 
   const rest = text.slice(start);
   const tail = rest.match(WARNING_TAIL);
@@ -56,8 +56,12 @@ function extractWarning(text: string): { value: string | null; allCaps: boolean 
   // Jenny Park's rejection case: the wording can be perfect while "Government Warning"
   // is in title case. Read the capitalisation off the source text, before normalising.
   const prefix = rest.match(WARNING_PREFIX)?.[0] ?? "";
+  // Title case reads as mostly lowercase. A single lowercase letter among capitals
+  // ("WARNiNG") is how OCR misreads an all-caps prefix, so that is left unknown.
   const letters = prefix.replace(/[^A-Za-z]/g, "");
-  return { value, allCaps: letters.length > 0 && letters === letters.toUpperCase() };
+  const lowercase = letters.replace(/[^a-z]/g, "").length;
+  const allCaps = lowercase === 0 ? true : lowercase * 2 >= letters.length ? false : null;
+  return { value, allCaps };
 }
 
 export function extractLabelFields(text: string): LabelFields {
@@ -148,6 +152,6 @@ export function extractLabelFields(text: string): LabelFields {
   // Only asserted when the statement was actually found. Bold is never set: weight is a
   // visual property that recognised text does not carry, so it stays unknown and the
   // comparison holds the warning for human confirmation.
-  if (warning.value) fields.warningPrefixAllCaps = warning.allCaps;
+  if (warning.value && warning.allCaps !== null) fields.warningPrefixAllCaps = warning.allCaps;
   return fields;
 }

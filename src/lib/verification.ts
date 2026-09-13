@@ -124,8 +124,41 @@ function resultForText(
   return { key, label, applicationValue, labelValue, confidence, note, status, matchTier };
 }
 
-export function compareFields(application: LabelFields, label: LabelFields): VerificationSummary {
-  const results = FIELD_DEFINITIONS.map(({ key, label: fieldLabel }) => {
+function percentOf(value: string | null): number | null {
+  const match = value?.match(/(\d+(?:[.,]\d+)?)\s*%/);
+  return match ? Number(match[1].replace(",", ".")) : null;
+}
+
+// Recognised text cannot tell a misread from a misprint: "bith" for "birth", a stray
+// line picked up as the brand. Only differences a misread cannot plausibly produce stay
+// a mismatch - two cleanly read numbers that disagree, or a warning prefix set mostly in
+// lowercase. Everything else is held for an agent to check against the artwork.
+// ponytail: a misread digit still reports Mismatch; gate on per-word OCR confidence if that shows up.
+function mismatchSurvivesOcr(result: FieldResult, label: LabelFields): boolean {
+  switch (result.key) {
+    case "governmentWarning":
+      return label.warningPrefixAllCaps === false;
+    case "alcoholContent": {
+      const expected = percentOf(result.applicationValue);
+      const read = percentOf(result.labelValue);
+      return expected !== null && read !== null && expected !== read;
+    }
+    case "netContents":
+      return (
+        normalizeNetContents(result.applicationValue ?? "") !== null &&
+        normalizeNetContents(result.labelValue ?? "") !== null
+      );
+    default:
+      return false;
+  }
+}
+
+export function compareFields(
+  application: LabelFields,
+  label: LabelFields,
+  options: { ocr?: boolean } = {}
+): VerificationSummary {
+  const compared = FIELD_DEFINITIONS.map(({ key, label: fieldLabel }) => {
     const applicationValue = application[key];
     const labelValue = label[key];
 
@@ -265,6 +298,18 @@ export function compareFields(application: LabelFields, label: LabelFields): Ver
       matches ? (exact ? "exact" : "normalized") : "mismatch"
     );
   });
+
+  const results = compared.map((result): FieldResult =>
+    options.ocr && result.status === "mismatch" && !mismatchSurvivesOcr(result, label)
+      ? {
+          ...result,
+          status: "review",
+          matchTier: "review",
+          confidence: CONFIDENCE.review,
+          note: `${result.note} The label was read by OCR, which can misread characters, so an agent should confirm this against the artwork.`
+        }
+      : result
+  );
 
   const matched = results.filter((result) => result.status === "match").length;
   const mismatched = results.filter((result) => result.status === "mismatch").length;
