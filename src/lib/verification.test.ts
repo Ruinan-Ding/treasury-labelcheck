@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fixtureCases, STANDARD_WARNING } from "../data/fixtures";
-import { compareFields, normalizeBrandName, validateGovernmentWarning } from "./verification";
+import { fixtureCases } from "../test/fixtures";
+import { compareFields, normalizeBrandName, STANDARD_WARNING, validateGovernmentWarning } from "./verification";
 
 describe("brand normalization", () => {
   it("ignores harmless capitalization and punctuation differences", () => {

@@ -1,12 +1,16 @@
-import { STANDARD_WARNING } from "../data/fixtures";
 import type {
   FieldKey,
   FieldResult,
-  MatchTier,
+  LabelCase,
   LabelFields,
+  MatchTier,
   VerificationStatus,
   VerificationSummary
 } from "../types";
+
+/** The health warning statement required by 27 CFR 16.21, verbatim. */
+export const STANDARD_WARNING =
+  "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.";
 
 export const FIELD_DEFINITIONS: Array<{ key: FieldKey; label: string }> = [
   { key: "brandName", label: "Brand name" },
@@ -31,7 +35,7 @@ export interface WarningValidation {
 // Confidence reports how certain a rule is about the verdict it just returned,
 // so an exact string verify always outranks one that needed normalization to get
 // there. It is a rule-based UI signal, not a calibrated model probability.
-export const CONFIDENCE = {
+const CONFIDENCE = {
   exact: 0.99,
   normalized: 0.9,
   mismatch: 0.95,
@@ -323,4 +327,9 @@ export function compareFields(
   // would hide real discrepancies behind a `?` in a 300-label queue.
   const overall: VerificationStatus = mismatched > 0 ? "mismatch" : needsReview > 0 ? "review" : "match";
   return { results, overall, matched, mismatched, needsReview };
+}
+
+/** Compares a case, applying the OCR tolerance rules when its label was read from an image. */
+export function summarizeCase(item: LabelCase): VerificationSummary {
+  return compareFields(item.application, item.label, { ocr: item.ocrStatus === "ocr" });
 }

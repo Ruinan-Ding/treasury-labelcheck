@@ -1,7 +1,7 @@
+import { STANDARD_WARNING } from "../lib/verification";
 import type { LabelCase, LabelFields } from "../types";
 
-export const STANDARD_WARNING =
-  "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.";
+// Structured cases shared by the unit tests.
 
 const baseApplication: LabelFields = {
   brandName: "OLD TOM DISTILLERY",
@@ -13,8 +13,7 @@ const baseApplication: LabelFields = {
   governmentWarning: STANDARD_WARNING
 };
 
-// Defaults first so a case can actually override the presentation flags; spreading
-// them last silently forced every label to a compliant prefix.
+// Defaults first so a case can override the presentation flags.
 const completeLabel = (overrides: Partial<LabelFields> = {}): LabelFields => ({
   ...baseApplication,
   warningPrefixAllCaps: true,
@@ -48,8 +47,7 @@ export const fixtureCases: LabelCase[] = [
     description: "The warning wording is incomplete and the required prefix is not presented correctly.",
     application: baseApplication,
     label: completeLabel({
-      governmentWarning:
-        "Government Warning: Consumption of alcoholic beverages impairs your ability to drive.",
+      governmentWarning: "Government Warning: Consumption of alcoholic beverages impairs your ability to drive.",
       warningPrefixAllCaps: false,
       warningBold: false
     }),

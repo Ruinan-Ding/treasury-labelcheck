@@ -1,21 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareFields } from "./verification";
-import { csvCell, nextCaseId, parseStructuredCase, toLabelFields } from "./cases";
-
-describe("csvCell", () => {
-  it("neutralizes spreadsheet formulas built from uploaded filenames", () => {
-    expect(csvCell("=cmd|'/c calc'!A1")).toBe(`"'=cmd|'/c calc'!A1"`);
-    for (const lead of ["=", "+", "-", "@", "\t", "\r"]) {
-      expect(csvCell(`${lead}HYPERLINK("http://evil")`).startsWith(`"'`)).toBe(true);
-    }
-  });
-
-  it("still escapes quotes and leaves ordinary values alone", () => {
-    expect(csvCell('Stone"s Throw')).toBe('"Stone""s Throw"');
-    expect(csvCell("OLD TOM DISTILLERY")).toBe('"OLD TOM DISTILLERY"');
-    expect(csvCell(42)).toBe('"42"');
-  });
-});
+import { nextCaseId, parseStructuredCase, toLabelFields } from "./cases";
 
 describe("nextCaseId", () => {
   it("stays unique across ids minted in the same millisecond", () => {
@@ -28,8 +13,7 @@ describe("parseStructuredCase", () => {
   const minimal = { application: { brandName: "A" }, label: { brandName: "A" } };
 
   it("ignores an id supplied by the uploaded file", () => {
-    // "pass" is a built-in fixture id; a collision makes the wrong case open and
-    // lets one click mark two cases reviewed.
+    // A colliding id makes the wrong case open and lets one click decide two cases.
     const first = parseStructuredCase({ ...minimal, id: "pass" }, "a.json")!;
     const second = parseStructuredCase({ ...minimal, id: "pass" }, "a.json")!;
     expect(first.id).not.toBe("pass");

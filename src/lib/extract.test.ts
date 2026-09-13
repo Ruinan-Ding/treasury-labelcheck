@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { STANDARD_WARNING } from "../data/fixtures";
 import { extractLabelFields } from "./extract";
-import { compareFields, validateGovernmentWarning } from "./verification";
+import { compareFields, STANDARD_WARNING, validateGovernmentWarning } from "./verification";
 
 const LABEL_TEXT = `OLD TOM DISTILLERY
 KENTUCKY STRAIGHT BOURBON WHISKEY

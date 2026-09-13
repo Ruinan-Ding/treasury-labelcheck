@@ -6,7 +6,7 @@
 
 // Bump when a saved shape changes, so a stale record from an earlier deploy is ignored
 // instead of reaching the comparison rules with fields they no longer expect.
-export const WORKSPACE_VERSION = 1;
+const WORKSPACE_VERSION = 1;
 
 const STORE = "workspace";
 let database: Promise<IDBDatabase> | undefined;

@@ -12,6 +12,9 @@ export type FieldKey =
 
 export type OcrStatus = "structured" | "ocr" | "unreadable" | "rejected" | "no-image";
 
+/** The agent's own call on a case, kept separate from the automated result. */
+export type HumanDecision = "accept" | "review" | "reject";
+
 export interface LabelFields {
   brandName: string | null;
   classType: string | null;

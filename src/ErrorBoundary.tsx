@@ -9,9 +9,8 @@ interface State {
   message: string | null;
 }
 
-// A render throw would otherwise unmount the whole tree and take the agent's queue
-// with it. Uploaded JSON is validated at the parse boundary, so this is the net for
-// what that validation does not anticipate.
+// A render error would otherwise unmount the whole app. Uploaded JSON is validated at the
+// parse boundary, so this is the net for what that validation does not anticipate.
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { message: null };
 
@@ -26,7 +25,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (this.state.message === null) return this.props.children;
     return (
-      <main className="empty-state" role="alert">
+      <main className="error-state" role="alert">
         <h1>Something went wrong displaying this case</h1>
         <p>
           No verification result is shown, so nothing here should be treated as a compliance decision.

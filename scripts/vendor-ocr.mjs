@@ -4,7 +4,7 @@
 // Tesseract.js otherwise fetches these from a public CDN at recognize() time. Marcus
 // Williams' interview notes say the TTB network blocks outbound traffic to most domains
 // and that the previous vendor pilot failed for exactly that reason, so OCR here has to
-// work with no egress at all. Running this at build time keeps ~20 MB of binaries out of
+// work with no egress at all. Running this at build time keeps ~23 MB of binaries out of
 // git while still shipping them with the deployed app.
 import { copyFile, mkdir, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";

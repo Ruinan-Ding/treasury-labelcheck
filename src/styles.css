@@ -42,14 +42,13 @@ button { cursor: pointer; }
 .online-dot { display: inline-block; width: 7px; height: 7px; background: #72d2a5; border-radius: 50%; margin-right: 6px; }
 
 .layout { display: grid; grid-template-columns: 310px minmax(0, 1fr); min-height: calc(100vh - 76px); }
-/* A full batch is 100 cases. The queue gets its own scroll region so the list never
-   pushes the case under review off the screen. */
+/* A batch can be 300 cases, so the queue scrolls on its own and never pushes the case
+   under review off the screen. */
 .sidebar {
   background: #fff; border-right: 1px solid #dce9e6; padding: 28px 18px 22px;
   display: flex; flex-direction: column;
   position: sticky; top: 76px; height: calc(100vh - 76px); overflow-y: auto;
 }
-.case-list { flex: 1; min-height: 0; overflow-y: auto; }
 .sidebar-heading { justify-content: space-between; margin: 0 8px 22px; }
 .sidebar h2, .page-heading h2, .section-heading h2 { margin: 0; font-family: "Segoe UI", Arial, sans-serif; letter-spacing: -0.04em; color: #18313a; }
 .sidebar h2 { font-size: 22px; }
@@ -78,8 +77,8 @@ button { cursor: pointer; }
 .empty-card h2 { margin: 5px 0 12px; color: #18313a; font-size: 30px; letter-spacing: -.04em; }
 .empty-card p:not(.eyebrow) { margin: 0 0 22px; color: #52696a; line-height: 1.6; }
 .upload-icon { font-size: 22px; line-height: 1; color: #25866f; }
-.fixture-label { margin: 27px 8px 9px; color: #52696a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
-.case-list { display: flex; flex-direction: column; gap: 3px; scrollbar-gutter: stable; }
+.queue-label { margin: 27px 8px 9px; color: #52696a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+.case-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-gutter: stable; }
 .case-button {
   width: 100%; text-align: left; display: flex; align-items: center; gap: 9px; padding: 10px 8px; border: 0; border-radius: 8px;
   background: transparent; color: #29484f;
@@ -112,15 +111,10 @@ button { cursor: pointer; }
 .secondary-button { border: 1px solid #b9d4ce; border-radius: 7px; padding: 8px 12px; background: white; color: #21564f; font-size: 14px; font-weight: 700; }
 .secondary-button:hover { background: #edf7f3; }
 .secondary-button:disabled { background: #f3f5f4; border-color: #d5dedb; color: #5f6f6c; cursor: not-allowed; }
-.overall-chip, .reviewed-chip { border-radius: 99px; padding: 8px 13px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-.chip-match, .reviewed-chip { color: #167357; background: #def3e8; }
-.chip-mismatch { color: #aa413b; background: #fce6e3; }
-.chip-review { color: #7d5609; background: #fff0cb; }
-.reviewed-chip { background: #e7eff0; color: #446065; }
-.decision-chip { border-radius: 99px; padding: 8px 13px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-.decision-chip-accept { color: #167357; background: #def3e8; }
-.decision-chip-review { color: #7d5609; background: #fff0cb; }
-.decision-chip-reject { color: #aa413b; background: #fce6e3; }
+.overall-chip, .decision-chip { border-radius: 99px; padding: 8px 13px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.chip-match, .decision-chip-accept { color: #167357; background: #def3e8; }
+.chip-mismatch, .decision-chip-reject { color: #aa413b; background: #fce6e3; }
+.chip-review, .decision-chip-review { color: #7d5609; background: #fff0cb; }
 .overview-grid { display: grid; grid-template-columns: repeat(3, minmax(110px, 1fr)) minmax(180px, 1.5fr); gap: 12px; margin-bottom: 31px; }
 .stat-card { min-height: 85px; background: white; border: 1px solid #e0ebe8; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; color: #52696b; font-size: 13px; }
 .stat-number { font: 700 27px "Segoe UI", Arial, sans-serif; }
@@ -192,9 +186,9 @@ button { cursor: pointer; }
 .decision-reject { border-color: #d88980; background: #fce8e5; color: #aa413b; }
 .notice { margin-bottom: 20px; padding: 11px 14px; background: #e8f4f0; border: 1px solid #c9e4da; color: #21564f; border-radius: 7px; font-size: 14px; }
 .notice-warn { background: #fff4e0; border-color: #e2bd77; color: #6f4b06; font-weight: 600; }
-.empty-state { padding: 50px; max-width: 640px; }
-.empty-state h1 { font-size: 22px; margin: 0 0 12px; }
-.empty-state p { font-size: 15px; color: #33545b; }
+.error-state { padding: 50px; max-width: 640px; }
+.error-state h1 { font-size: 22px; margin: 0 0 12px; }
+.error-state p { font-size: 15px; color: #33545b; }
 .error-detail { font-family: Consolas, "Courier New", monospace; font-size: 13px; background: #f1f5f4; border: 1px solid #dce9e6; border-radius: 6px; padding: 10px; overflow-wrap: anywhere; }
 
 @media (max-width: 1000px) {
@@ -210,9 +204,8 @@ button { cursor: pointer; }
     border-right: 0; border-bottom: 1px solid #dce9e6; padding: 20px 16px;
     position: static; height: auto;
   }
-  .case-list { max-height: 320px; }
+  .case-list { max-height: 320px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar-footnote { margin-top: 20px; }
-  .case-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .content { padding: 25px 16px 35px; }
   .page-heading { align-items: flex-start; flex-direction: column; }
   .heading-actions { align-self: auto; }

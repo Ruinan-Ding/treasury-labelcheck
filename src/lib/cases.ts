@@ -3,7 +3,7 @@ import type { LabelCase, LabelFields, OcrStatus } from "../types";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-export const emptyLabel: LabelFields = {
+const emptyLabel: LabelFields = {
   brandName: null,
   classType: null,
   alcoholContent: null,
@@ -13,18 +13,9 @@ export const emptyLabel: LabelFields = {
   governmentWarning: null
 };
 
-// Excel evaluates a leading =, +, - or @ when the file is opened, and these cells
-// carry filenames and JSON supplied by whoever submitted the label.
-export function csvCell(value: string | number): string {
-  const text = String(value);
-  const guarded = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-  return `"${guarded.replace(/"/g, '""')}"`;
-}
-
-// Date.now() has 1 ms resolution and the batch schedules several jobs, so a counter is
-// what actually keeps these unique. Ids are ours alone: one supplied by an uploaded JSON
-// could collide with a fixture or with a second upload of the same file. The timestamp
-// keeps ids from a restored workspace apart from ones minted after the refresh.
+// Ids are always minted here: one taken from an uploaded JSON could collide with a second
+// upload of the same file. The counter keeps ids minted in the same millisecond apart,
+// and the timestamp keeps them apart from ids restored from a saved workspace.
 let caseSequence = 0;
 export function nextCaseId(prefix: string): string {
   caseSequence += 1;

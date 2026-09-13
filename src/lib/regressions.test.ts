@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import sampleCase from "../../public/samples/structured-case.json";
-import { fixtureCases, STANDARD_WARNING } from "../data/fixtures";
-import type { LabelFields } from "../types";
-import { compareFields, normalizeBrandName } from "./verification";
+import { fixtureCases } from "../test/fixtures";
+import type { FieldKey, LabelFields } from "../types";
+import { compareFields, normalizeBrandName, STANDARD_WARNING } from "./verification";
 
 const application = fixtureCases[0].application;
 const label = fixtureCases[0].label;
 
-function field(app: Partial<LabelFields>, lbl: Partial<LabelFields>, key: Parameters<typeof compareFields> extends never ? never : "brandName" | "netContents" | "alcoholContent" | "governmentWarning") {
+function field(app: Partial<LabelFields>, lbl: Partial<LabelFields>, key: FieldKey) {
   const result = compareFields({ ...application, ...app }, { ...label, ...lbl });
   return result.results.find((item) => item.key === key)!;
 }
@@ -89,27 +89,13 @@ describe("government warning without an application record", () => {
   });
 });
 
-describe("fixtures", () => {
-  it("lets a case override the warning presentation flags", () => {
-    // The 'Warning failure' case is the demo of Jenny's title-case rejection; it has to
-    // actually carry the failing presentation, not just failing wording.
+describe("structured warning presentation", () => {
+  it("names every presentation failure a structured record asserts", () => {
     const failing = fixtureCases.find((item) => item.id === "warning-failure")!;
-    expect(failing.label.warningPrefixAllCaps).toBe(false);
-    expect(failing.label.warningBold).toBe(false);
-
-    const result = compareFields(failing.application, failing.label);
-    const warning = result.results.find((item) => item.key === "governmentWarning")!;
+    const warning = field({}, failing.label, "governmentWarning");
     expect(warning.status).toBe("mismatch");
     expect(warning.note).toContain("all caps");
     expect(warning.note).toContain("bold");
-  });
-
-  it("keeps the compliant fixtures compliant", () => {
-    for (const id of ["pass", "brand-normalization"]) {
-      const item = fixtureCases.find((c) => c.id === id)!;
-      expect(item.label.warningPrefixAllCaps).toBe(true);
-      expect(compareFields(item.application, item.label).overall).toBe("match");
-    }
   });
 });
 

@@ -59,7 +59,7 @@ npm run dev      # http://localhost:5173
 ```
 
 ```bash
-npm test         # 63 tests
+npm test         # 66 tests
 npm run build    # type-check and produce dist/
 npm run preview  # serve the production build
 ```
@@ -244,30 +244,35 @@ reports no vulnerabilities.
 
 ## Testing
 
-63 tests across five files, run on every push by GitHub Actions
-([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) along with a production build.
+66 tests across six files, run on every push by GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) along with the type check and a
+production build.
 
 | File | Covers |
 | --- | --- |
 | `src/lib/verification.test.ts` | Comparison rules: warning validation, alcohol notation, pass/mismatch/review outcomes. |
 | `src/lib/regressions.test.ts` | Edge cases pinned after they were found: statutory wording, dual-unit, fluid-ounce and comma-grouped volumes, accented brands, blank values, statute-only warning checks, confidence ordering. |
 | `src/lib/extract.test.ts` | OCR field extraction, including title-case detection, brand and class separation, "Bottled in Bond", the warning's closing punctuation, and misreads captured from the deployed app. |
-| `src/lib/cases.test.ts` | The untrusted-upload boundary: CSV formula escaping, ID uniqueness, malformed JSON. |
+| `src/lib/csv.test.ts` | The export: formula escaping, byte-order mark, one full-width row per case, on-screen wording, refused files left blank. |
+| `src/lib/cases.test.ts` | The untrusted-upload boundary: ID uniqueness, type coercion, malformed JSON. |
 | `src/lib/batch.test.ts` | Input-order preservation, the cap, bounded concurrency, error propagation. |
 
 ## Project layout
 
 ```
 src/
-  App.tsx                review workspace, upload flow, CSV export
+  App.tsx                review workspace: upload, compare, decide, export
   ErrorBoundary.tsx      recovers from a render failure without a blank page
-  lib/ocr.ts             Tesseract worker, preprocessing, asset wiring
+  types.ts               shared domain types
+  lib/verification.ts    all comparison rules and the 27 CFR 16.21 warning text
   lib/extract.ts         recognised text -> LabelFields
-  lib/verification.ts    all comparison rules
+  lib/ocr.ts             Tesseract worker and image preprocessing
   lib/cases.ts           untrusted-input boundary, filename pairing
   lib/batch.ts           bounded batch processing
+  lib/csv.ts             review-queue export
+  lib/labels.ts          wording shared by the screen and the export
   lib/workspace-store.ts IndexedDB persistence
-  data/fixtures.ts       test fixtures and the 27 CFR 16.21 warning text
+  test/fixtures.ts       structured cases used by the tests
 public/samples/          sample label artwork and application records
 scripts/vendor-ocr.mjs   copies OCR assets from node_modules at build time
 docs/ASSIGNMENT.md       the original brief
