@@ -1,330 +1,283 @@
 # LabelCheck
 
 A prototype that helps a TTB compliance agent verify an alcohol beverage label against
-its COLA application. Upload the label artwork; the app reads it on the spot, compares
-every mandated field against the application record, and tells the agent which fields it
-is confident about and which ones a human still has to decide.
+its application. Upload the label artwork and the application record; the app reads the
+label on the spot, compares every mandated field, and tells the agent which fields it is
+confident about and which ones a human still has to decide.
 
 Built for the Treasury IT Specialist (AI) take-home assignment. The brief it answers is
 in [`docs/ASSIGNMENT.md`](docs/ASSIGNMENT.md).
 
-**It runs entirely in the browser.** OCR, comparison, and export all happen on the
-reviewer's machine. Nothing is uploaded, no API key is required, and the app makes no
-outbound request of any kind after the page loads.
-
-The deployed site is publicly hosted, but the label data is processed only in the
-reviewer's browser. The interface identifies this as **Browser-only processing** so
-hosting location is not confused with data-processing location.
-
 **Live prototype:** [treasury-labelcheck.vercel.app](https://treasury-labelcheck.vercel.app/)
 
----
+**It runs entirely in the browser.** OCR, comparison, and export all happen on the
+reviewer's machine. There is no backend and no API key, and the app never contacts any
+host other than the one it was loaded from — the constraint Marcus Williams described,
+where the TTB firewall blocked the last vendor's cloud ML endpoints. The site is publicly
+hosted, but label data is processed only in the browser, which is why the interface says
+**Browser-only processing**.
 
-## Quick start
+## Try it in a minute
 
-Requires Node.js 18+ and npm.
+1. Open the [live prototype](https://treasury-labelcheck.vercel.app/).
+2. Click **Stage sample batch**. Seventeen label images and seventeen application records
+   appear in the two upload lists on the left; two of each have no partner.
+3. Click **Compare uploaded files**. The batch takes about 13 seconds on a laptop,
+   including the one-time model load. Select any case in the queue to see its field-by-field result.
+
+| Sample | What it demonstrates | Expected result |
+| --- | --- | --- |
+| `old-tom` | A clean, compliant label | 6 match; warning held for review (bold cannot be proven from an image) |
+| `stones-throw` | Dave Morrison's case: `STONE'S THROW` on the label, `Stone's Throw` in the application | Brand is a **normalized match** |
+| `harbor-mist` | Jenny Park's case: `Government Warning:` in title case, plus a wrong ABV and volume | 3 mismatches |
+| `abv-mismatch` | Label says 37.5%, application says 40% | Alcohol content mismatch |
+| `volume-mismatch` | Net contents differ | Net contents mismatch |
+| `warning-titlecase` | Correct wording, title-case prefix | Government warning mismatch |
+| `warning-punctuation` | The warning ends `problems!` instead of `problems.` | Warning held for review with "does not exactly match" |
+| `missing-warning` | No government warning printed at all | Warning held for review; it may be absent or unreadable |
+| `brand-difference` | Label says `SILVER CREEK`, application says `SILVER CROWN` | Brand held for review; OCR cannot tell a different name from a misread |
+| `normalized-units` | `0.75 L` and `45% ABV` against `750 mL` and `45% Alc./Vol.` | Normalized matches |
+| `fluid-ounce-volume` | `25.4 fl oz` in the application, `750 mL` on the label | Normalized match |
+| `import-origin` | An imported gin with origin and producer statements | Origin matches; `Ltd.` vs `LTD` held for review |
+| `missing-fields` | No country-of-origin statement on the label | Country held for review, never guessed |
+| `low-contrast-review` | Faded grey text on a cream background | Read correctly after contrast stretching |
+| `unreadable-review` | Noise, no text | Every field held for review |
+| `label-only-a`, `label-only-b` | Label images with no application record | `↔`; only the statutory warning can be checked |
+| `application-only-a`, `application-only-b` | Application records with no label image | `↔`; every field held for review |
+
+[`public/samples/structured-case.json`](public/samples/structured-case.json) is not part
+of the batch. Upload it in the application box to see a complete structured case, which
+is compared at once without OCR.
+
+## Run it locally
+
+Requires Node.js 20.19+ or 22.12+ (Vite 7) and npm.
 
 ```bash
 npm install
-npm run dev
+npm run dev      # http://localhost:5173
 ```
 
-Open the URL Vite prints (normally `http://localhost:5173`).
-
 ```bash
-npm test         # 57 tests
+npm test         # 63 tests
 npm run build    # type-check and produce dist/
 npm run preview  # serve the production build
 ```
 
 `npm install` pulls the OCR engine; `npm run dev` and `npm run build` then copy its
-worker, WASM core, and English model into `public/tesseract/` automatically. No manual
-step, and no network access is needed once `npm install` has finished.
+worker, WASM core, and English model into `public/tesseract/` automatically. There is no
+manual step, and no network access is needed once `npm install` has finished.
 
-## Try it
+## Using it
 
-The [`public/samples/`](public/samples) directory contains a synthetic, copyright-safe
-batch of paired PNG label artworks and application JSON records. Stage the JSON files
-in the **application** upload box and the images in the **label** upload box, then
-click **Compare uploaded files**. The app pairs them by matching base filename:
+**Upload.** Application records go in the first box, label images in the second. Files
+can be added at different times, and each staged file can be removed with its `x`.
+Nothing is compared until **Compare uploaded files** is clicked. An image is paired with
+the record whose filename matches, ignoring case and extension, so `old-tom.png` is
+compared against `old-tom.json`. Up to 300 files can be staged, and anything over the
+limit is reported as omitted.
 
-| Upload | What it demonstrates |
-| --- | --- |
-| `old-tom.png` + `old-tom.json` | A clean pass. Six fields verify; the warning is held for a human because bold cannot be proven from an image. |
-| `stones-throw.png` + `stones-throw.json` | Dave Morrison's judgment case: the label says `STONE'S THROW`, the application says `Stone's Throw`. Reported as a **normalized match**, not a mismatch. |
-| `harbor-mist.png` + `harbor-mist.json` | Jenny Park's rejection case: correct warning wording in title case is a **mismatch**, alongside a genuine ABV and volume discrepancy. |
+Unpaired files are still processed rather than dropped. A lone label image is checked
+against the statutory warning, which comes from law rather than from the application. A
+lone record becomes a review case saying no image arrived. Both are marked `↔` in the
+queue.
 
-Additional paired cases cover:
+**Read the queue.** `✓` means every field matched, `!` means at least one field is a
+confirmed mismatch, `?` means nothing is wrong but something needs a human, and `↔`
+means the files did not pair. A confirmed mismatch outranks a pending review, so a
+problem label is never hidden behind a `?`.
 
-- `abv-mismatch` — a numeric alcohol-content discrepancy.
-- `volume-mismatch` — a net-content discrepancy.
-- `warning-titlecase` and `warning-punctuation` — strict warning failures.
-- `normalized-units` and `fluid-ounce-volume` — equivalent labels and explicit volume units.
-- `import-origin` — imported-product origin and producer fields.
-- `missing-fields` — an unavailable country-of-origin field held for review.
-- `low-contrast-review` — a deliberately degraded but readable image.
-- `unreadable-review` — a noisy image that should remain review-only.
+**Decide.** **Accept**, **Needs review**, and **Reject** record the agent's own decision,
+shown as a coloured dot in the queue. They never overwrite the automated result.
 
-Unpaired inputs are included deliberately:
+**Export.** **Export CSV** writes the whole queue locally, one row per case: source files,
+pairing, OCR confidence and recognised text, the overall result, the human decision, and
+for each of the seven fields the application value, label evidence, status, tier,
+confidence, and explanatory note. Values use the same words as the screen (`Mismatch`,
+`Normalized match`, `Accepted`). The file opens cleanly in Excel, including accented
+text, and cells a spreadsheet would execute as formulas are escaped.
 
-- `application-only-a.json` and `application-only-b.json` — application
-  records with no corresponding image.
-- `label-only-a.png` and `label-only-b.png` — label images with no
-  corresponding application record.
+**Refresh or reset.** The queue, staged files, and decisions are kept in this browser's
+IndexedDB, so a page refresh loses nothing. **Reset workspace** clears it all.
 
-The directory contains 13 paired JSON/PNG cases plus two JSON-only and two
-image-only cases, enough to exercise normal matching, repeated uploads,
-mismatches, normalization, strict-warning failures, unreadable evidence,
-missing fields, and both unmatched-file directions. These are demo inputs, not additional Treasury requirements. They make the
-important decision paths reproducible without external image downloads.
+### Application record format
 
-Upload a label image on its own and it is still read and checked against the statutory
-warning — that requirement comes from law, not from the application record.
+The brief scopes out COLA integration, so the application arrives as a JSON file:
 
-The queue starts blank so the first screen reflects the real review workflow.
-For a reproducible demo, stage the paired JSON records and label images from
-`public/samples/` in their separate upload boxes and click **Compare uploaded
-files**. This exercises the same OCR and filename-pairing path as a real batch.
+```json
+{
+  "application": {
+    "brandName": "OLD TOM DISTILLERY",
+    "classType": "Kentucky Straight Bourbon Whiskey",
+    "alcoholContent": "45% Alc./Vol. (90 Proof)",
+    "netContents": "750 mL",
+    "bottlerProducer": "Old Tom Distillery, Frankfort, KY",
+    "countryOfOrigin": "United States",
+    "governmentWarning": "GOVERNMENT WARNING: (1) According to the Surgeon General, ..."
+  }
+}
+```
 
-The two upload boxes intentionally keep staged application records and label artwork
-separate. Files may be added at different times; comparison starts only when the agent
-clicks the compare button. Individual staged files can be removed with the `x` control,
-and **Reset workspace** clears the current batch and returns to the blank starting state.
-The compare action can run with JSON records alone, creating explicit application-only
-review cases; images alone are also OCR-processed. Files beyond the 300-file staging
-limit are reported as omitted rather than silently processed.
-Matching is case-insensitive and uses the filename before
-the final extension. The upload sidebar scrolls for large batches without shrinking
-the staged file rows. Unmatched
-records and images are still processed into explicit review cases rather than being
-dropped or paired by upload order. An unmatched pairing uses a separate `↔` queue icon;
-`!` is reserved for a confirmed comparison mismatch.
-
-Comparing another staged batch adds its cases to the existing verification queue; it
-does not replace earlier results. Use **Reset workspace** when starting a completely
-new queue.
-
-After inspecting a case, the agent can record a separate human decision:
-**Accept**, **Needs review**, or **Reject**. The selected decision is grayed out but
-can be changed, and its green, yellow, or red indicator appears beside the case in
-the verification queue. This decision is distinct from the automated comparison
-status and is included in the local CSV export.
-
-The CSV includes the complete textual case record: case ID, source files, description,
-input/pairing status, OCR confidence and recognized text, warning-presentation metadata,
-the complete case summary, and each required field's application value, label evidence,
-status, match tier, confidence, and explanatory note. The uploaded image itself remains
-in the browser queue rather than being embedded in the text export. Paired cases use the
-filename stem as the case name; unmatched files retain their `.json` or image
-extension so the missing pairing is visible. If the same Case name appears more
-than once, the export suffixes later rows with `(2)`, `(3)`, and so on.
-
-CSV column meanings:
-
-- **Case / Source file / Description** identify the queue item and the evidence used.
-- **Input status** says whether the item was a structured record, OCR label, unreadable
-  input, or rejected file.
-- **Pairing status** is `Matched`, `Unmatched`, or `Not applicable` for structured
-  records.
-- **Overall status** is the automated result: `Match`, `Mismatch`, `Review`, or
-  `Not processed`. `Matches`, `Mismatches`, and `Needs review` count the seven
-  required fields.
-- **Processing time (ms)** is the local elapsed time for the item; it is blank when
-  an application-only case was created without OCR.
-- **Human decision** is the agent's separate `Accept`, `Needs review`, or `Reject`
-  choice. It does not overwrite the automated result.
-- Each field has six columns: application value, label evidence, field status,
-  match tier (`exact`, `normalized`, `mismatch`, or `review`), confidence, and the
-  rule explanation.
-  Rejected files leave these field columns blank because no comparison ran.
-
-Queue icons have the same meanings: `✓` is an automated match, `!` is a confirmed
-comparison mismatch, `?` means evidence needs review, and `↔` means the JSON and
-image did not pair. A small green, yellow, or red dot beside a case records the
-agent's human decision.
+Any field may be missing or `null`; it is then reported as Review. A file that also
+carries a `label` object with the same keys is a complete structured case and is compared
+directly without OCR. It may assert `warningPrefixAllCaps` and `warningBold`, which an
+image cannot prove. [`structured-case.json`](public/samples/structured-case.json) is an
+example.
 
 ## Approach
 
-The core loop the stakeholder interviews describe is: *an agent looks at the label
-artwork and checks it against the application*. So the prototype had to actually read a
-label, not ask the agent to transcribe one.
+The core loop in the stakeholder interviews is *an agent looks at the label artwork and
+checks it against the application*. So the prototype had to actually read a label, not
+ask the agent to transcribe one.
 
-**Reading the label.** Tesseract is compiled to WebAssembly and runs in the browser.
-Marcus Williams' notes say the TTB network blocks outbound traffic to most domains, and
-that the previous vendor pilot failed for exactly that reason, so a cloud OCR API was
-never a viable choice. The worker, the WASM core, and the ~2.9 MB English model are
-served from the app's own origin — `scripts/vendor-ocr.mjs` copies them out of
-`node_modules` at build time, which also keeps ~23 MB of binaries out of git.
+**Reading the label.** Tesseract compiled to WebAssembly runs in the browser. A cloud OCR
+API was never viable given the firewall. The worker, WASM core, and ~2.9 MB English model
+are served from the app's own origin; `scripts/vendor-ocr.mjs` copies them out of
+`node_modules` at build time, which also keeps ~23 MB of binaries out of git. Each image
+is converted to grayscale and contrast-stretched first, which recovers flatly under- or
+over-exposed photographs.
 
 **Reading the fields.** `src/lib/extract.ts` turns recognised text into the same
 `LabelFields` shape a JSON upload produces, so both inputs meet identical comparison
-rules. Every rule is anchored to wording TTB actually mandates — the statutory warning, a
+rules. Every rule is anchored to wording TTB mandates: the statutory warning, a
 percentage beside an alcohol term, a volume beside a real unit, a "bottled by" statement,
-a "product of" statement. Only the brand name is resolved positionally, because it is the
-one field with no required phrasing. **A field that cannot be found stays null and is
+a "product of" statement. Class/type is the line carrying a beverage term, and the brand
+is the first line no other rule claimed. **A field that cannot be found stays empty and is
 reported as Review; it is never guessed.**
-
-**Pairing.** A peak-season batch arrives as a folder of artwork plus the matching
-records, so `old-tom.png` is compared against `old-tom.json`. Matching on the filename the
-submitter already uses avoids inventing a manifest format for a prototype. An application
-record whose image never arrived is reported, not silently dropped.
 
 **Deciding.** `src/lib/verification.ts` holds every comparison rule. Each field gets a
 status (Match / Mismatch / Review), a tier (exact / normalized), and a confidence figure.
-The app never decides a case — it sorts the obvious from the ones needing judgment, which
-is what Sarah Chen said her agents actually need.
+The app never decides a case. It sorts the obvious from the ones needing judgment, which
+is what Sarah Chen said her agents need.
 
 ### How each field is judged
 
-- **Government warning** — checked verbatim against 27 CFR 16.21: wording,
-  capitalization, and punctuation must match, and only differences in how the source
-  wrapped whitespace are tolerated. Title case in the prefix is a mismatch. Because the
-  statute governs the label rather than the application, a lone label image is still
-  checked against it.
-- **Brand name** — accents are decomposed so they are stripped from their base letter
-  rather than erasing the character (`MÖET` and `MÄET` must not normalize alike), then
-  case and punctuation are normalized. This is what makes `STONE'S THROW` and
-  `Stone's Throw` the same brand.
-- **Net contents** — converted to millilitres when the unit is explicit. The unit is read
-  from the text beside the matched number, so `750 mL (25.4 FL OZ)` reads as 750 mL, not
-  as its parenthetical equivalent. A comma is a thousands separator when it groups three
-  digits and a decimal separator otherwise. Equivalent volumes match within 1 mL.
-- **Alcohol content** — common notations are normalized (`45% by volume`, `45% Alc./Vol.`,
-  `45% ABV`) without converting or inferring any value.
-- **Everything else** — whitespace and case normalization only.
-- **Labels read by OCR** — recognised text cannot tell a misread from a misprint, so a
+- **Government warning:** checked verbatim against 27 CFR 16.21. Wording, capitalization,
+  and punctuation must match; only the way the text wraps is ignored. A title-case prefix
+  is a mismatch. Because the statute governs the label rather than the application, a lone
+  label image is still checked against it.
+- **Brand name:** case, punctuation, and accents are normalized, so `STONE'S THROW` and
+  `Stone's Throw` are the same brand. Accents are stripped from their base letter rather
+  than deleting the character, so `MÖET` and `MÄET` stay different.
+- **Alcohol content:** common notations are treated alike (`45% by volume`,
+  `45% Alc./Vol.`, `45% ABV`) without converting or inferring any value.
+- **Net contents:** converted to millilitres when the unit is explicit, and matched within
+  1 mL. When a fluid-ounce figure is involved the slack is 1.5 mL, because labels round
+  ounces to one decimal (750 mL prints as 25.4 fl oz, which is 751.2 mL). In
+  `750 mL (25.4 FL OZ)` the unit is read beside the first number, so it counts as 750 mL.
+- **Everything else:** whitespace and case normalization only.
+- **Labels read by OCR:** recognised text cannot tell a misread from a misprint, so a
   difference in wording is Review, not Mismatch. Only what a misread cannot plausibly
   produce stays a mismatch: two cleanly read percentages or volumes that disagree, or a
   warning prefix set mostly in lowercase. A single stray lowercase letter (`WARNiNG`) is
   treated as a misread.
-- **Missing values** — a blank on either side is Review, never a mismatch. A gap in the
-  application is a data-entry problem for an agent, not evidence against the label.
+- **Missing values:** a blank on either side is Review, never a mismatch.
 
-Confidence reports how certain a rule is about the verdict it returned: an exact string
-verify (0.99) outranks one that needed normalization (0.90); a mismatch is 0.95 and
-anything held for a human is 0.35. A fuzzier judgement never outranks a stricter one. It
-is a transparent rule-based signal, **not** a calibrated model probability.
+Confidence reports how certain a rule is about its verdict: an exact match is 0.99, a
+normalized match 0.90, a mismatch 0.95, and anything held for a human 0.35. It is a
+transparent rule-based signal, **not** a calibrated model probability.
 
 ### Meeting the interview constraints
 
 | Constraint | How it is met |
 | --- | --- |
-| Results in ~5 seconds (Sarah) | 1.0–2.3 s per label measured end to end, including field extraction. Each case reports its own time. The OCR worker is created once and reused, so the model load is paid once per session rather than per label. |
-| Usable by a 73-year-old; half the team is 50+ (Sarah) | Every text colour meets WCAG AA contrast, body and comparison text is at least 11px, status is carried by text and glyph as well as colour, every control has a visible focus ring, and the batch reports progress instead of going quiet. |
-| Batch of 200–300 (Sarah, Janet) | Cap is 300, above the largest batch described. Three jobs are scheduled with preserved input order while the reused OCR worker processes image recognition safely, and one bad file never discards the batch. |
-| No cloud APIs; firewall blocks egress (Marcus) | Zero outbound requests after page load. OCR assets are same-origin. |
-| No PII, no COLA integration (Marcus) | No server, no network, no credentials. The workspace is kept only in the agent's own browser (IndexedDB) so a refresh does not lose a batch, and Reset workspace erases it. Object URLs are released when the queue is cleared. |
-| Judgment, not blind pattern matching (Dave) | Normalization tiers separate an exact verify from a harmless formatting difference, and anything uncertain is handed to the agent rather than auto-decided. |
-| Warning exact, all-caps and bold (Jenny) | Verbatim statutory comparison plus a separate capitalization check. Bold is treated as unprovable from an image — see below. |
-| Imperfect images (Jenny) | Grayscale plus a contrast stretch recovers text from flatly under- or over-exposed photographs. Skew, perspective, and glare are not corrected. |
+| Results in ~5 seconds (Sarah) | The 17-label sample batch finishes in about 13 s including the one-time model load, under 0.8 s per label. A single upload returns in about 2 s. Each case shows its elapsed time, which in a batch includes its wait for the shared OCR worker. |
+| Usable by a 73-year-old; half the team is 50+ (Sarah) | One upload box per input, one Compare button, and a one-click sample batch. Text meets WCAG AA contrast, status is carried by words and glyphs as well as colour, every control has a visible focus ring, and a batch reports progress instead of going quiet. |
+| Batches of 200–300 (Sarah, Janet) | Up to 300 files per batch, paired by filename. One unreadable or oversized file becomes its own review case and never discards the batch. |
+| No cloud APIs; firewall blocks egress (Marcus) | No request leaves the app's own origin. OCR assets are served from it. |
+| No PII, no COLA integration (Marcus) | No server, credentials, or telemetry. The workspace lives only in the agent's own browser and **Reset workspace** erases it. |
+| Judgment, not blind pattern matching (Dave) | Normalization tiers separate an exact match from a harmless formatting difference, and anything uncertain goes to the agent rather than being auto-decided. |
+| Warning exact, all caps, and bold (Jenny) | Verbatim statutory comparison plus a separate capitalization check. Bold is treated as unprovable from an image; see below. |
+| Imperfect images (Jenny) | Contrast stretching handles bad exposure. Skew, perspective, and glare are not corrected. |
 
 ## Tools used
 
 | Tool | Why |
 | --- | --- |
-| React 18 + TypeScript + Vite | A static SPA needs no server, which makes the no-egress constraint trivially satisfiable and the deployment a plain file copy. |
-| tesseract.js 7 (+ `@tesseract.js-data/eng`) | The only mature OCR engine that runs fully client-side. Pinned to the LSTM engine, with page segmentation set to `AUTO`. |
+| React 18 + TypeScript + Vite | A static single-page app needs no server, which makes the no-egress constraint easy to satisfy and deployment a plain file copy. |
+| tesseract.js 7 (+ `@tesseract.js-data/eng`) | A mature OCR engine that runs fully client-side. Pinned to the LSTM engine with automatic page segmentation. |
 | Vitest | Same toolchain as Vite; no extra configuration. |
+| IndexedDB (browser built-in) | Keeps the workspace, including image files, across a refresh without a server. |
 
-Runtime dependencies are React, React DOM, and tesseract.js. Everything else is a build or
-test dependency, and `npm audit` reports no vulnerabilities.
+The only runtime dependencies are React, React DOM, and tesseract.js, and `npm audit`
+reports no vulnerabilities. GitHub Copilot and Claude Code were used as coding assistants
+during development.
 
 ## Assumptions and trade-offs
 
-- **Bold cannot be proven from recognised text**, so the warning on an image is never
-  auto-passed — it is held for human confirmation with the reason stated. This is
-  deliberate: Jenny Park's requirement is that the prefix be all caps *and* bold, and
-  claiming to have verified something the reader cannot see would be worse than saying so.
-  A structured upload may assert `warningBold` explicitly.
-- **OCR is a reading aid, not a decision-maker.** Recognised text is shown in full beside
-  the artwork so an agent who disagrees with a field can see exactly what the reader saw.
-- **The application record is trusted input; uploaded files are not.** Uploaded JSON is
-  validated into `LabelFields`, non-string values are coerced or dropped, and case ids are
-  always minted by the app so an uploaded file cannot collide with another case. CSV cells
-  beginning `=`, `+`, `-`, or `@` are quoted so a spreadsheet will not execute them as
-  formulas.
-- **A refused file reports `Not processed`, not seven Review rows** — it never reached the
-  comparison rules, and implying a review that never happened would be misleading. An
-  unreadable *label* is different: it lists its fields, because an agent does have to look.
-- **Uploads are capped at 10 MB and must be JSON or an image.** Batches over 300 report
-  how many files were not processed rather than silently truncating.
-- **Confidence is a UI signal, not a probability.** See above.
-- **Normalization is deliberately narrow.** It covers harmless brand formatting,
-  whitespace and case, and explicitly labelled units. It never infers a missing value or
-  guesses a unit from a bare number.
+- **The application arrives as a JSON file**, paired with its label by filename. COLA
+  integration is out of scope, and a folder of artwork plus records is how an importer's
+  batch would realistically be handed over.
+- **Bold cannot be proven from recognised text**, so a warning read from an image is never
+  auto-passed. It is held for human confirmation with the reason stated. Claiming to have
+  verified something the reader cannot see would be worse than saying so.
+- **OCR is a reading aid, not a decision-maker.** The recognised text is shown in full
+  beside the artwork, so an agent who disagrees with a field can see exactly what was read.
+- **Uploaded files are untrusted.** JSON is validated field by field, non-string values
+  are coerced or dropped, case IDs are always minted by the app, and uploads are limited
+  to 10 MB and JSON or image types.
+- **A refused file reports `Not processed`**, not seven Review rows, because it never
+  reached the comparison rules.
+- **Normalization is deliberately narrow.** It never infers a missing value or guesses a
+  unit from a bare number.
 
 ## Limitations and what I would do next
 
-- **Geometry is not corrected.** A label photographed at an angle or with glare will read
-  poorly. Deskew and perspective correction are the natural next step and were out of
-  scope here.
+- **No manual entry form.** Application data must come from a JSON file; a form would suit
+  one-off checks.
+- **Geometry is not corrected.** A label photographed at an angle or with glare reads
+  poorly. Deskew and perspective correction are the natural next step.
 - **A misread digit is still a mismatch.** `750 mL` read as `150 mL` reports Mismatch,
   because numbers are the one thing the OCR rule trusts. Gating on Tesseract's per-word
   confidence would catch it.
-- **Brand name is positional.** It is the first line no stronger rule claimed. A label
-  with heavy decorative text above the brand could mislead it; the recognised-text panel
-  exists partly so an agent can catch that.
-- **OCR is serialized on one worker.** It is CPU-bound, so a 300-image batch is a
-  background job, not an interactive wait. A worker pool sized to `hardwareConcurrency`
-  would be the first optimization if throughput mattered.
-- **English only**, and no COLA integration — Marcus explicitly scoped that out.
-- **Persistence is per browser.** The queue, staged files, selection, and decisions
-  survive a refresh, but they live in one browser on one machine until Reset workspace.
-  If two tabs are open, the last one to save wins. A batch interrupted by a refresh is
-  not resumed; its files stay staged, so Compare can simply be run again. Real use would
-  need a shared review record, which brings the retention and PII questions Marcus flagged.
+- **Brand and class are positional.** A label with decorative text above the brand can
+  mislead the extractor; the recognised-text panel lets an agent catch that.
+- **Punctuation outside the brand counts.** `Ltd.` against `LTD` in a producer address is
+  held for review rather than matched.
+- **OCR runs on one worker.** Three labels are prepared at a time while it reads, which
+  more than halves batch time, but a 300-label batch is still a background job of about
+  four minutes. A worker pool sized to the machine's cores would be the next optimization.
+- **English only.**
+- **Persistence is per browser.** Work lives in one browser on one machine until reset. If
+  two tabs are open, the last to save wins, and a refresh mid-batch leaves the files
+  staged to be compared again. Real use would need a shared review record, which raises
+  the retention and PII questions Marcus flagged.
 
 ## Testing
 
-57 tests across five files:
+63 tests across five files, run on every push by GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) along with a production build.
 
 | File | Covers |
 | --- | --- |
 | `src/lib/verification.test.ts` | Comparison rules: warning validation, alcohol notation, pass/mismatch/review outcomes. |
-| `src/lib/regressions.test.ts` | Edge cases pinned after they were found: statutory wording, dual-unit and comma-grouped volumes, accented brands, locale-invariant folding, blank values, statute-only warning checks, confidence ordering. |
-| `src/lib/extract.test.ts` | OCR field extraction, including the title-case rejection and refusing to read a proof number as a volume; misreads captured from the deployed app held for review, while Harbor Mist's real discrepancies still mismatch. |
-| `src/lib/cases.test.ts` | The untrusted-upload boundary: CSV formula escaping, id uniqueness, malformed JSON. |
+| `src/lib/regressions.test.ts` | Edge cases pinned after they were found: statutory wording, dual-unit, fluid-ounce and comma-grouped volumes, accented brands, blank values, statute-only warning checks, confidence ordering. |
+| `src/lib/extract.test.ts` | OCR field extraction, including title-case detection, brand and class separation, "Bottled in Bond", the warning's closing punctuation, and misreads captured from the deployed app. |
+| `src/lib/cases.test.ts` | The untrusted-upload boundary: CSV formula escaping, ID uniqueness, malformed JSON. |
 | `src/lib/batch.test.ts` | Input-order preservation, the cap, bounded concurrency, error propagation. |
 
 ## Project layout
 
 ```
 src/
-  App.tsx              review workspace, upload flow, CSV export
-  ErrorBoundary.tsx    keeps a render failure from discarding the queue
-  lib/ocr.ts           Tesseract worker, preprocessing, asset wiring
-  lib/extract.ts       recognised text -> LabelFields
-  lib/verification.ts  all comparison rules
-  lib/cases.ts         untrusted-input boundary, filename pairing
-  lib/batch.ts         bounded concurrent batch processing
-  data/fixtures.ts     sample cases and the 27 CFR 16.21 warning text
-scripts/vendor-ocr.mjs copies OCR assets from node_modules at build time
-public/samples/        sample label artwork and application records
+  App.tsx                review workspace, upload flow, CSV export
+  ErrorBoundary.tsx      recovers from a render failure without a blank page
+  lib/ocr.ts             Tesseract worker, preprocessing, asset wiring
+  lib/extract.ts         recognised text -> LabelFields
+  lib/verification.ts    all comparison rules
+  lib/cases.ts           untrusted-input boundary, filename pairing
+  lib/batch.ts           bounded batch processing
+  lib/workspace-store.ts IndexedDB persistence
+  data/fixtures.ts       test fixtures and the 27 CFR 16.21 warning text
+public/samples/          sample label artwork and application records
+scripts/vendor-ocr.mjs   copies OCR assets from node_modules at build time
+docs/ASSIGNMENT.md       the original brief
 ```
 
 ## Deployment
 
-The build output is static; any static host will serve it.
-
-```bash
-npm run build   # writes dist/
-```
-
-`vercel.json` is included for a zero-configuration Vercel deploy. The live prototype
-is available at [treasury-labelcheck.vercel.app](https://treasury-labelcheck.vercel.app/).
-No environment
-variables or credentials are required at runtime. Note that `dist/` includes ~23 MB of
-OCR assets — that is the cost of running OCR without egress, and only the model plus one
-WASM core (~6 MB) is fetched by any given browser.
-
-GitHub Pages is also configured through `.github/workflows/deploy-pages.yml`.
-Enable **Settings → Pages → Source: GitHub Actions** in the repository, then
-push to `main` or run the workflow manually. The published site will be:
-
-```text
-https://treasurytakehome-rgb.github.io/instructions/
-```
-
-The Vite build automatically uses `/instructions/` as its asset base on GitHub
-Actions builds, so the bundled OCR worker, WASM, and language model resolve
-correctly from the project site. Local development continues to use `/`.
+The build output is static, so any static host can serve it. The live prototype is on
+Vercel, which rebuilds from `main` using [`vercel.json`](vercel.json). No environment
+variables or credentials are needed. `dist/` includes ~23 MB of OCR assets; that is the
+cost of running OCR without egress, and a given browser fetches only the model and one
+WASM core (~6 MB).

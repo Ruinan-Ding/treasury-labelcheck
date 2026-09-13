@@ -62,6 +62,30 @@ describe("extractLabelFields", () => {
     expect(fields.brandName).toBe("OLD TOM DISTILLERY");
   });
 
+  it("keeps a firm name ending in 'Spirits' from displacing the class", () => {
+    // Read off the abv-mismatch sample: the brand swallowed the class and vice versa.
+    const fields = extractLabelFields("RIVER BEND SPIRITS\nDistilled Vodka\n750 mL");
+    expect(fields.brandName).toBe("RIVER BEND SPIRITS");
+    expect(fields.classType).toBe("Distilled Vodka");
+  });
+
+  it("still reads a class printed above the brand", () => {
+    const fields = extractLabelFields("Kentucky Straight Bourbon Whiskey\nOLD TOM\nFinished in port casks\n750 mL");
+    expect(fields.classType).toBe("Kentucky Straight Bourbon Whiskey");
+    expect(fields.brandName).toBe("OLD TOM");
+  });
+
+  it("does not take 'Bottled in Bond' as the bottler", () => {
+    const fields = extractLabelFields("OLD TOM\nBottled in Bond\nBottled by Old Tom Distillery, Frankfort, KY");
+    expect(fields.bottlerProducer).toBe("Old Tom Distillery, Frankfort, KY");
+  });
+
+  it("reports the warning's closing punctuation as printed", () => {
+    const fields = extractLabelFields(LABEL_TEXT.replace("health problems.", "health problems!"));
+    expect(fields.governmentWarning?.endsWith("health problems!")).toBe(true);
+    expect(validateGovernmentWarning({ ...fields, warningBold: true }).exactText).toBe(false);
+  });
+
   it("does not read the proof number as a volume", () => {
     // "(90 Proof)" sits next to the ABV; only a real unit may become net contents.
     expect(extractLabelFields("BRAND\n45% Alc./Vol. (90 Proof)").netContents).toBeNull();

@@ -60,7 +60,8 @@ function normalizeComparable(value: string): string {
 
 function normalizeAlcoholContent(value: string): string {
   return normalizeComparable(value)
-    .replace(/(?:alc(?:ohol)?\.?\s*\/\s*vol(?:ume)?\.?|alc(?:ohol)?\.?\s+vol(?:ume)?\.?)/g, "abv")
+    // "Alc.Vol." (no slash) is how OCR commonly reads "Alc./Vol.".
+    .replace(/(?:alc(?:ohol)?\.?\s*\/\s*vol(?:ume)?\.?|alc(?:ohol)?\.?\s*vol(?:ume)?\.?)/g, "abv")
     .replace(/%\s*by\s*(?:volume|vol\.?)/g, "% abv")
     .replace(/\bvol(?:ume)?\.?\b/g, "abv")
     .replace(/\s*\/\s*/g, "/")
@@ -73,7 +74,7 @@ function normalizeAlcoholContent(value: string): string {
 export const NET_CONTENTS_PATTERN =
   /(\d+(?:[.,]\d+)?)\s*(milliliters?|millilitres?|ml|centiliters?|centilitres?|cl|liters?|litres?|l|fl\.?\s*oz\.?|fluid ounces?)\b/;
 
-function normalizeNetContents(value: string): number | null {
+function normalizeNetContents(value: string): { ml: number; ounces: boolean } | null {
   // "1,500 mL" is 1500, not 1.5 - only strip a comma that groups thousands.
   const normalized = value.normalize("NFKC").toLowerCase().replace(/(\d),(?=\d{3}\b)/g, "$1");
   const match = normalized.match(NET_CONTENTS_PATTERN);
@@ -82,12 +83,13 @@ function normalizeNetContents(value: string): number | null {
   const amount = Number(match[1].replace(",", "."));
   if (!Number.isFinite(amount)) return null;
 
-  // Unit is read next to the matched number, so "750 mL (25.4 FL OZ)" is 750 mL.
-  const unit = match[2].replace(/[.\s]/g, "");
-  if (unit.startsWith("ml") || unit.startsWith("milli")) return amount;
-  if (unit.startsWith("cl") || unit.startsWith("centi")) return amount * 10;
-  if (unit.startsWith("fl") || unit.startsWith("fluid")) return amount * 29.5735;
-  return amount * 1000;
+  // Unit is read next to the matched number, so "750 mL (25.4 FL OZ)" is 750 mL. Every
+  // unit the pattern accepts is identified by its first letter: ml/milli, cl/centi,
+  // fl oz/fluid, l/liter.
+  const unit = match[2][0];
+  const ounces = unit === "f";
+  const ml = unit === "m" ? amount : unit === "c" ? amount * 10 : ounces ? amount * 29.5735 : amount * 1000;
+  return { ml, ounces };
 }
 
 export function validateGovernmentWarning(fields: LabelFields): WarningValidation {
@@ -275,8 +277,10 @@ export function compareFields(
       : normalizeComparable(labelValue);
     const applicationVolume = key === "netContents" ? normalizeNetContents(applicationValue) : null;
     const labelVolume = key === "netContents" ? normalizeNetContents(labelValue) : null;
+    // Labels round the fluid-ounce figure to one decimal: 750 mL prints as 25.4 fl oz, which
+    // is 751.2 mL. Half a tenth of an ounce is 1.48 mL, so that pairing gets 1.5 mL of slack.
     const matches = key === "netContents" && applicationVolume !== null && labelVolume !== null
-      ? Math.abs(applicationVolume - labelVolume) < 1
+      ? Math.abs(applicationVolume.ml - labelVolume.ml) < (applicationVolume.ounces || labelVolume.ounces ? 1.5 : 1)
       : normalizedApplication === normalizedLabel;
     const exact = applicationValue === labelValue;
     return resultForText(
@@ -314,6 +318,9 @@ export function compareFields(
   const matched = results.filter((result) => result.status === "match").length;
   const mismatched = results.filter((result) => result.status === "mismatch").length;
   const needsReview = results.filter((result) => result.status === "review").length;
-  const overall: VerificationStatus = needsReview > 0 ? "review" : mismatched > 0 ? "mismatch" : "match";
+  // A confirmed mismatch outranks a field still under review. Every label read from an
+  // image holds its warning for review, because bold cannot be proven, so review-first
+  // would hide real discrepancies behind a `?` in a 300-label queue.
+  const overall: VerificationStatus = mismatched > 0 ? "mismatch" : needsReview > 0 ? "review" : "match";
   return { results, overall, matched, mismatched, needsReview };
 }

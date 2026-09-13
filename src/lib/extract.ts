@@ -15,17 +15,18 @@ import type { LabelFields } from "../types";
 const NET_CONTENTS = new RegExp(NET_CONTENTS_PATTERN.source, "i");
 
 const WARNING_PREFIX = /government\s+warning\s*:?/i;
-// The statutory statement ends here; a label often prints more text below it.
-const WARNING_TAIL = /health\s+problems\s*\.?/i;
+// The statutory statement ends here; a label often prints more text below it. Whatever
+// punctuation closes it is kept, so a "problems!" on the label is reported as printed.
+const WARNING_TAIL = /health\s+problems\s*[.!?,;:]?/i;
 
 const ALCOHOL_TERM = /\b(?:alc(?:ohol)?|abv|by\s+vol(?:ume)?|vol(?:ume)?|proof)\b/i;
 const PERCENTAGE = /\d+(?:\.\d+)?\s*%/;
 
 const CLASS_TERMS =
-  /\b(?:whisk(?:e)?y|bourbon|rye|scotch|vodka|gin|rum|tequila|mezcal|brandy|cognac|liqueur|cordial|wine|chardonnay|merlot|cabernet|riesling|pinot|zinfandel|sauvignon|champagne|prosecco|sherry|port|vermouth|sake|beer|ale|lager|stout|porter|pilsner|cider|perry|mead|malt\s+beverage|spirits?)\b/i;
+  /\b(?:whisk(?:e)?y|bourbon|rye|scotch|vodka|gin|rum|tequila|mezcal|brandy|cognac|liqueur|cordial|wine|chardonnay|merlot|cabernet|riesling|pinot|zinfandel|sauvignon|champagne|prosecco|sherry|port|vermouth|sake|beer|ale|lager|stout|porter|pilsner|cider|perry|mead|malt\s+beverage)\b/i;
 
 const PRODUCER_LEAD =
-  /^(?:bottled|produced|distilled|brewed|vinted|blended|packed|imported|manufactured)(?:\s*(?:,|and|&)?\s*(?:bottled|produced|distilled|brewed|vinted|blended|packed|imported))*\s+(?:by|for|in)\s*:?\s*/i;
+  /^(?:bottled|produced|distilled|brewed|vinted|blended|packed|imported|manufactured)(?:\s*(?:,|and|&)?\s*(?:bottled|produced|distilled|brewed|vinted|blended|packed|imported))*\s+(?:by|for)\s*:?\s*/i;
 
 const ORIGIN_PATTERNS = [
   /\bproduct\s+of\s*:?\s*(.+)/i,
@@ -126,18 +127,14 @@ export function extractLabelFields(text: string): LabelFields {
   // Class and brand are both free text with no mandated phrasing, so they are resolved
   // last, from whatever no stronger rule has claimed. The class is identified by its
   // beverage term; the brand is the first line left over, which is where labels put it.
-  let classType: string | null = null;
-  let brandName: string | null = null;
-
-  lines.forEach((line, index) => {
-    if (claimed.has(index) || classType) return;
-    if (CLASS_TERMS.test(line)) classType = claim(index, line);
-  });
-
-  lines.forEach((line, index) => {
-    if (claimed.has(index) || brandName) return;
-    brandName = claim(index, line);
-  });
+  // "Spirits" is weak evidence: it is as likely to be part of a firm's name ("RIVER BEND
+  // SPIRITS" above "Distilled Vodka") as a class, so it only decides when nothing specific does.
+  const leftover = lines.map((line, index) => ({ line, index })).filter(({ index }) => !claimed.has(index));
+  const classLine =
+    leftover.find(({ line }) => CLASS_TERMS.test(line)) ?? leftover.find(({ line }) => /\bspirits?\b/i.test(line));
+  const classType = classLine ? claim(classLine.index, classLine.line) : null;
+  const brandLine = leftover.find(({ index }) => !claimed.has(index));
+  const brandName = brandLine ? claim(brandLine.index, brandLine.line) : null;
 
   const fields: LabelFields = {
     brandName,

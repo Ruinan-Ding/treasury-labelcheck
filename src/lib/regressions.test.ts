@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import sampleCase from "../../sample-case.json";
+import sampleCase from "../../public/samples/structured-case.json";
 import { fixtureCases, STANDARD_WARNING } from "../data/fixtures";
 import type { LabelFields } from "../types";
 import { compareFields, normalizeBrandName } from "./verification";
@@ -14,7 +14,7 @@ function field(app: Partial<LabelFields>, lbl: Partial<LabelFields>, key: Parame
 
 describe("government warning", () => {
   it("uses the statutory 27 CFR 16.21 wording, so a compliant label passes", () => {
-    // The README walks a reviewer through uploading this exact file.
+    // The README points a reviewer at this exact file as the structured-case example.
     const result = compareFields(sampleCase.application as LabelFields, sampleCase.label as LabelFields);
     expect(result.overall).toBe("match");
     expect(STANDARD_WARNING).toContain("birth defects. (2) Consumption");
@@ -117,6 +117,11 @@ describe("net contents", () => {
   it("reads the unit next to the number, not a parenthetical equivalent", () => {
     expect(field({ netContents: "750 mL" }, { netContents: "750 mL (25.4 FL OZ)" }, "netContents").status).toBe("match");
     expect(field({ netContents: "1 L" }, { netContents: "1 L (33.8 fl oz)" }, "netContents").status).toBe("match");
+    // 25.4 fl oz is the rounded label equivalent of 750 mL; 25.3 fl oz is not.
+    expect(field({ netContents: "25.4 fl oz" }, { netContents: "750 mL" }, "netContents").status).toBe("match");
+    expect(field({ netContents: "25.3 fl oz" }, { netContents: "750 mL" }, "netContents").status).toBe("mismatch");
+    // The ounce slack follows the unit that was compared, not a parenthetical beside it.
+    expect(field({ netContents: "750 mL" }, { netContents: "751.4 mL (25.4 fl oz)" }, "netContents").status).toBe("mismatch");
   });
 
   it("treats a comma as a thousands separator, not a decimal point", () => {

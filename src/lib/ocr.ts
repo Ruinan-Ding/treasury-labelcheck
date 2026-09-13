@@ -6,8 +6,8 @@ export interface OcrResult {
   preprocessed: boolean;
 }
 
-// Vite rewrites BASE_URL when the app is served from a sub-path, so a GitHub Pages
-// deployment finds these too. scripts/vendor-ocr.mjs puts the files here at build time.
+// BASE_URL keeps these resolvable if the app is served from a sub-path.
+// scripts/vendor-ocr.mjs puts the files here at build time.
 const ASSET_BASE = `${import.meta.env.BASE_URL}tesseract/`;
 
 // Tesseract loads a ~3 MB model and a WASM core on first use. Creating a worker per

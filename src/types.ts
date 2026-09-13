@@ -10,7 +10,7 @@ export type FieldKey =
   | "countryOfOrigin"
   | "governmentWarning";
 
-export type OcrStatus = "structured" | "ocr" | "unreadable" | "rejected";
+export type OcrStatus = "structured" | "ocr" | "unreadable" | "rejected" | "no-image";
 
 export interface LabelFields {
   brandName: string | null;

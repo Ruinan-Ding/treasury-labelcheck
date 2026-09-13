@@ -190,7 +190,7 @@ button { cursor: pointer; }
 .decision-accept { border-color: #73b99e; background: #e1f4ea; color: #167357; }
 .decision-review { border-color: #dfbd68; background: #fff3d2; color: #7d5609; }
 .decision-reject { border-color: #d88980; background: #fce8e5; color: #aa413b; }
-.notice { margin-top: 20px; padding: 11px 14px; background: #e8f4f0; border: 1px solid #c9e4da; color: #21564f; border-radius: 7px; font-size: 14px; }
+.notice { margin-bottom: 20px; padding: 11px 14px; background: #e8f4f0; border: 1px solid #c9e4da; color: #21564f; border-radius: 7px; font-size: 14px; }
 .notice-warn { background: #fff4e0; border-color: #e2bd77; color: #6f4b06; font-weight: 600; }
 .empty-state { padding: 50px; max-width: 640px; }
 .empty-state h1 { font-size: 22px; margin: 0 0 12px; }

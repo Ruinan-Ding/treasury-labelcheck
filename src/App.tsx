@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CONCURRENCY, MAX_BATCH_SIZE, processBatch } from "./lib/batch";
 import { compareFields, FIELD_DEFINITIONS } from "./lib/verification";
 import { extractLabelFields } from "./lib/extract";
@@ -30,6 +30,26 @@ interface PendingApplication {
 
 type HumanDecision = "accept" | "review" | "reject";
 let stagedApplicationSequence = 0;
+
+// The committed files under public/samples/. The unpaired ones exercise the `↔` paths.
+const SAMPLE_PAIRS = [
+  "old-tom", "stones-throw", "harbor-mist", "abv-mismatch", "volume-mismatch", "warning-titlecase",
+  "warning-punctuation", "missing-warning", "brand-difference", "normalized-units", "fluid-ounce-volume",
+  "import-origin", "missing-fields", "low-contrast-review", "unreadable-review"
+];
+const SAMPLE_JSON = [...SAMPLE_PAIRS, "application-only-a", "application-only-b"].map((name) => `${name}.json`);
+const SAMPLE_IMAGES = [...SAMPLE_PAIRS, "label-only-a", "label-only-b"].map((name) => `${name}.png`);
+
+function decisionLabel(decision: HumanDecision): string {
+  return decision === "accept" ? "Accepted" : decision === "reject" ? "Rejected" : "Needs review";
+}
+
+// Clearing the input lets the same file be chosen again after it is removed.
+function takeFiles(event: ChangeEvent<HTMLInputElement>): File[] {
+  const files = Array.from(event.target.files || []);
+  event.target.value = "";
+  return files;
+}
 
 // Saved as two records so selecting a case or recording a decision does not rewrite
 // every stored image.
@@ -66,7 +86,9 @@ function inputStatusLabel(status: OcrStatus): string {
       ? "Label read by OCR"
       : status === "rejected"
         ? "File rejected"
-        : "Unreadable input";
+        : status === "no-image"
+          ? "No label image"
+          : "Unreadable input";
 }
 
 function baseCaseName(item: LabelCase): string {
@@ -130,6 +152,8 @@ export default function App() {
   const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [storage, setStorage] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [loadingSamples, setLoadingSamples] = useState(false);
+  const samplesInFlight = useRef(false);
 
   useEffect(() => {
     Promise.all([loadWorkspace<SavedQueue>("queue"), loadWorkspace<SavedView>("view")])
@@ -184,9 +208,7 @@ export default function App() {
   );
   const summary = selected ? summaries.get(selected.id) : undefined;
 
-  async function loadApplicationFiles(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.target;
-    const selectedFiles = Array.from(input.files || []);
+  async function loadApplicationFiles(selectedFiles: File[]) {
     const available = Math.max(0, MAX_BATCH_SIZE - pendingApplications.length);
     const files = selectedFiles.slice(0, available);
     const records: PendingApplication[] = [];
@@ -221,12 +243,9 @@ export default function App() {
       tone: invalid.length > 0 || omitted > 0 ? "warn" : "info",
       text: `${records.length} application record${records.length === 1 ? "" : "s"} staged for comparison.${structured.length > 0 ? ` ${structured.length} complete structured case${structured.length === 1 ? "" : "s"} loaded.` : ""}${invalid.length > 0 ? ` ${invalid.join("; ")}.` : ""}${omitted > 0 ? ` ${omitted} file${omitted === 1 ? "" : "s"} omitted because the 300-file staging limit was reached.` : ""}`
     });
-    input.value = "";
   }
 
-  function stageImageFiles(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.target;
-    const selectedFiles = Array.from(input.files || []);
+  function stageImageFiles(selectedFiles: File[]) {
     const accepted = selectedFiles.filter((file) => file.type.startsWith("image/"));
     const rejected = selectedFiles.filter((file) => !file.type.startsWith("image/")).map((file) => file.name);
     const available = Math.max(0, MAX_BATCH_SIZE - pendingImages.length);
@@ -237,7 +256,36 @@ export default function App() {
       tone: rejected.length > 0 || omitted > 0 ? "warn" : "info",
       text: `${staged.length} image${staged.length === 1 ? "" : "s"} staged for comparison.${rejected.length > 0 ? ` Unsupported files ignored: ${rejected.join(", ")}.` : ""}${omitted > 0 ? ` ${omitted} image${omitted === 1 ? "" : "s"} omitted because the 300-file staging limit was reached.` : ""}`
     });
-    input.value = "";
+  }
+
+  // Stages the committed sample batch through the same path as a manual upload, so a
+  // reviewer opening the deployed app can try it without downloading anything first.
+  // Only offered while nothing is staged, so the samples can never hit the staging limit
+  // or be staged twice, and the summary notice below cannot hide an upload warning.
+  async function stageSampleBatch() {
+    // A ref, not the state below: two clicks can land before React re-renders the button.
+    if (samplesInFlight.current) return;
+    samplesInFlight.current = true;
+    setLoadingSamples(true);
+    const fetchSample = async (name: string, type: string) => {
+      const response = await fetch(`${import.meta.env.BASE_URL}samples/${name}`);
+      if (!response.ok) throw new Error(`${name} returned ${response.status}`);
+      return new File([await response.blob()], name, { type });
+    };
+    try {
+      const [records, images] = await Promise.all([
+        Promise.all(SAMPLE_JSON.map((name) => fetchSample(name, "application/json"))),
+        Promise.all(SAMPLE_IMAGES.map((name) => fetchSample(name, "image/png")))
+      ]);
+      await loadApplicationFiles(records);
+      stageImageFiles(images);
+      setNotice({ tone: "info", text: `${records.length} sample application records and ${images.length} label images are staged, including two of each with no partner. Click Compare uploaded files to check them.` });
+    } catch {
+      setNotice({ tone: "warn", text: "The sample batch could not be loaded. Files can still be uploaded from the two boxes on the left." });
+    } finally {
+      samplesInFlight.current = false;
+      setLoadingSamples(false);
+    }
   }
 
   async function compareStagedFiles() {
@@ -286,7 +334,9 @@ export default function App() {
           done += 1;
           setProgress({ done, total: pendingImages.length });
         }
-      }, DEFAULT_CONCURRENCY);
+      }, DEFAULT_CONCURRENCY); // Recognition queues on one worker, but decoding the next
+      // images overlaps it: 17 samples took 13 s this way against 30 s one at a time. Each
+      // label's reported time therefore includes its wait in that queue.
       const orphanApplications = pendingApplications.filter((item) => !paired.has(item.id));
       const orphanCases = orphanApplications.map((item) => makeApplicationOnlyCase(item.file, item.fields));
       const unmatchedImages = read.filter((item) => !item.applicationSource).length;
@@ -383,7 +433,7 @@ export default function App() {
       const fieldValues = refused ? FIELD_DEFINITIONS.flatMap(() => ["", "", "", "", "", ""]) : FIELD_DEFINITIONS.flatMap(({ key }) => {
         const result = itemSummary.results.find((candidate) => candidate.key === key);
         return result
-          ? [result.applicationValue ?? "", result.labelValue ?? "", result.status, result.matchTier, `${Math.round(result.confidence * 100)}%`, result.note]
+          ? [result.applicationValue ?? "", result.labelValue ?? "", statusLabel(result.status), tierLabel(result.matchTier), `${Math.round(result.confidence * 100)}%`, result.note]
           : ["", "", "", "", "", ""];
       });
       return [
@@ -395,7 +445,7 @@ export default function App() {
         inputStatusLabel(item.ocrStatus),
         item.pairingStatus === "unmatched" ? "Unmatched" : item.pairingStatus === "matched" ? "Matched" : "Not applicable",
         item.ocrConfidence === undefined ? "" : `${Math.round(item.ocrConfidence * 100)}%`,
-        item.ocrText ?? "",
+        item.ocrText?.trim() ?? "",
         item.label.warningPrefixAllCaps === undefined ? "" : item.label.warningPrefixAllCaps ? "Yes" : "No",
         item.label.warningBold === undefined ? "" : item.label.warningBold ? "Yes" : "No",
         refused ? "Not processed" : statusLabel(itemSummary.overall),
@@ -403,17 +453,20 @@ export default function App() {
         refused ? "" : itemSummary.mismatched,
         refused ? "" : itemSummary.needsReview,
         item.processingTimeMs ?? "",
-        decisions[item.id] ?? "",
+        decisions[item.id] ? decisionLabel(decisions[item.id]) : "",
         ...fieldValues
       ];
     });
     const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    // The byte-order mark makes Excel read UTF-8 instead of the Windows codepage, so
+    // curly apostrophes and accented brands survive.
+    const url = URL.createObjectURL(new Blob([String.fromCharCode(0xfeff), csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = "labelcheck-review-queue.csv";
     link.click();
-    URL.revokeObjectURL(url);
+    // Revoked later: some browsers start the download after click() returns.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
     setNotice({ tone: "info", text: "Review queue exported locally. No files or results were sent anywhere." });
   }
 
@@ -433,15 +486,30 @@ export default function App() {
         <aside className="sidebar" aria-label="Cases and uploads">
           <div className="sidebar-heading"><div><p className="eyebrow">Verification queue</p><h2>Cases</h2></div><span className="count-badge">0</span></div>
           <div className="upload-heading">Prepare a batch</div>
-          <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload application JSON files</strong><span>Stage records here before comparison</span><input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" /></label>
+          <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload application JSON files</strong><span>Stage records here before comparison</span><input type="file" accept=".json,application/json" multiple onChange={(event) => void loadApplicationFiles(takeFiles(event))} disabled={isProcessing} aria-label="Upload application JSON files" /></label>
           <div className="pending-files">{pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.id}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(String(item.id))} aria-label={`Remove ${item.file.name}`}>x</button></span>)}</div>
-          <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload label images</strong><span>Read locally with OCR · max {MAX_BATCH_SIZE}</span><input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" /></label>
+          <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload label images</strong><span>Read locally with OCR · max {MAX_BATCH_SIZE}</span><input type="file" accept="image/*" multiple onChange={(event) => stageImageFiles(takeFiles(event))} disabled={isProcessing} aria-label="Upload label images" /></label>
           <div className="pending-files">{pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span className="pending-file" key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button type="button" onClick={() => removeImage(file)} aria-label={`Remove ${file.name}`}>x</button></span>)}</div>
           <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || (pendingImages.length === 0 && pendingApplications.length === 0)}>{isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}</button>
           {(pendingApplications.length > 0 || pendingImages.length > 0) && <button className="reset-button" type="button" onClick={resetWorkspace} disabled={isProcessing}>Reset workspace</button>}
-          <div className="sidebar-footnote"><strong>Bounded batch processing</strong><span>Up to {MAX_BATCH_SIZE} items, {DEFAULT_CONCURRENCY} in-process workers.</span></div>
+          <div className="sidebar-footnote"><strong>Bounded batch processing</strong><span>Up to {MAX_BATCH_SIZE} items, read on this device by one reused OCR worker.</span></div>
         </aside>
-        <main className="content empty-state"><div className="empty-card"><p className="eyebrow">Ready for review</p><h2>Start with a real batch</h2><p>Stage application JSON files and label images in the two upload boxes, then compare them. Nothing is preloaded.</p></div></main>
+        <main className="content empty-state">
+          <div className="empty-card">
+            {notice && <div className={`notice notice-${notice.tone}`} role="status">{notice.text}</div>}
+            <p className="eyebrow">Ready for review</p>
+            <h2>Start with a real batch</h2>
+            <p>Stage application JSON files and label images in the two upload boxes, then compare them. Nothing is preloaded.</p>
+            {pendingApplications.length === 0 && pendingImages.length === 0 && (
+              <>
+                <p>First time here? Stage the sample batch of {SAMPLE_IMAGES.length} labels, then click <strong>Compare uploaded files</strong>.</p>
+                <button className="primary-button" type="button" onClick={stageSampleBatch} disabled={isProcessing || loadingSamples}>
+                  {loadingSamples ? "Staging samples..." : "Stage sample batch"}
+                </button>
+              </>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );
@@ -481,7 +549,7 @@ export default function App() {
             <span className="upload-icon" aria-hidden="true">↑</span>
             <strong>Upload application JSON files</strong>
             <span>Stage records here before comparison</span>
-            <input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" />
+            <input type="file" accept=".json,application/json" multiple onChange={(event) => void loadApplicationFiles(takeFiles(event))} disabled={isProcessing} aria-label="Upload application JSON files" />
           </label>
           <div className="pending-files">
             {pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.id}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(String(item.id))} aria-label={`Remove ${item.file.name}`}>x</button></span>)}
@@ -490,7 +558,7 @@ export default function App() {
             <span className="upload-icon" aria-hidden="true">↑</span>
             <strong>Upload label images</strong>
             <span>Read locally with OCR · max {MAX_BATCH_SIZE}</span>
-            <input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" />
+            <input type="file" accept="image/*" multiple onChange={(event) => stageImageFiles(takeFiles(event))} disabled={isProcessing} aria-label="Upload label images" />
           </label>
           <div className="pending-files">
             {pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span className="pending-file" key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button type="button" onClick={() => removeImage(file)} aria-label={`Remove ${file.name}`}>x</button></span>)}
@@ -525,11 +593,13 @@ export default function App() {
           </nav>
           <div className="sidebar-footnote">
             <strong>Bounded batch processing</strong>
-            <span>Up to {MAX_BATCH_SIZE} items, {DEFAULT_CONCURRENCY} in-process workers.</span>
+            <span>Up to {MAX_BATCH_SIZE} items, read on this device by one reused OCR worker.</span>
           </div>
         </aside>
 
         <main className="content">
+          {/* At the top so an upload warning is seen, not left below the fold. */}
+          {notice && <div className={`notice notice-${notice.tone}`} role="status">{notice.text}</div>}
           <section className="page-heading">
             <div>
               <p className="eyebrow">Case review</p>
@@ -618,7 +688,6 @@ export default function App() {
               </div>
             </aside>
           </div>
-          {notice && <div className={`notice notice-${notice.tone}`} role="status">{notice.text}</div>}
         </main>
       </div>
     </div>

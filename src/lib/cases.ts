@@ -129,7 +129,8 @@ export function makeApplicationOnlyCase(file: File, application: LabelFields): L
     description: "Application record parsed, but no matching label image was uploaded. Human review is required.",
     application,
     label: emptyLabel,
-    ocrStatus: "unreadable",
+    // The record was read fine; there was just no artwork to read it against.
+    ocrStatus: "no-image",
     sourceName: file.name,
     pairingStatus: "unmatched"
   };

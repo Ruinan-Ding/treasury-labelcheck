@@ -72,6 +72,22 @@ describe("field comparison", () => {
     expect(result.results.find((item) => item.key === "alcoholContent")?.status).toBe("match");
   });
 
+  it("reads OCR's slashless 'Alc.Vol.' as the same notation", () => {
+    const application = { ...fixtureCases[0].application, alcoholContent: "44% Alc./Vol." };
+    const label = { ...fixtureCases[0].label, alcoholContent: "44% Alc.Vol." };
+    expect(compareFields(application, label).results.find((item) => item.key === "alcoholContent")?.status).toBe("match");
+  });
+
+  it("reports a case with both a mismatch and an open review as a mismatch", () => {
+    // Every label read from an image leaves its warning in review, so review-first would
+    // hide this discrepancy behind a `?` in the queue.
+    const label = { ...fixtureCases[0].label, alcoholContent: "40% ABV", warningBold: undefined };
+    const summary = compareFields(fixtureCases[0].application, label);
+    expect(summary.mismatched).toBe(1);
+    expect(summary.needsReview).toBe(1);
+    expect(summary.overall).toBe("mismatch");
+  });
+
   it("does not treat different alcohol values as equivalent", () => {
     const application = { ...fixtureCases[0].application, alcoholContent: "45% Alc./Vol." };
     const label = { ...fixtureCases[0].label, alcoholContent: "40% ABV" };
