@@ -21,12 +21,14 @@ interface Notice {
 }
 
 interface PendingApplication {
+  id: number;
   file: File;
   fields: LabelFields;
   key: string;
 }
 
 type HumanDecision = "accept" | "review" | "reject";
+let stagedApplicationSequence = 0;
 
 function statusLabel(status: VerificationStatus): string {
   return status === "match" ? "Match" : status === "mismatch" ? "Mismatch" : "Review";
@@ -131,10 +133,13 @@ export default function App() {
 
   async function loadApplicationFiles(event: ChangeEvent<HTMLInputElement>) {
     const input = event.target;
-    const files = Array.from(input.files || []).slice(0, MAX_BATCH_SIZE);
+    const selectedFiles = Array.from(input.files || []);
+    const available = Math.max(0, MAX_BATCH_SIZE - pendingApplications.length);
+    const files = selectedFiles.slice(0, available);
     const records: PendingApplication[] = [];
     const structured: LabelCase[] = [];
     const invalid: string[] = [];
+    const omitted = selectedFiles.length - files.length;
     for (const file of files) {
       try {
         if (file.size > MAX_UPLOAD_BYTES) {
@@ -144,7 +149,7 @@ export default function App() {
         const value = JSON.parse(await file.text());
         const record = parseApplicationRecord(value);
         if (record) {
-          records.push({ file, fields: record, key: pairingKey(file.name) });
+          records.push({ id: ++stagedApplicationSequence, file, fields: record, key: pairingKey(file.name) });
           continue;
         }
         const parsed = parseStructuredCase(value, file.name);
@@ -158,10 +163,10 @@ export default function App() {
       setCases((current) => [...structured, ...current]);
       setSelectedId(structured[0].id);
     }
-    setPendingApplications((current) => [...current, ...records]);
+    setPendingApplications((current) => [...current, ...records].slice(0, MAX_BATCH_SIZE));
     setNotice({
-      tone: invalid.length > 0 ? "warn" : "info",
-      text: `${records.length} application record${records.length === 1 ? "" : "s"} staged for comparison.${structured.length > 0 ? ` ${structured.length} complete structured case${structured.length === 1 ? "" : "s"} loaded.` : ""}${invalid.length > 0 ? ` ${invalid.join("; ")}.` : ""}`
+      tone: invalid.length > 0 || omitted > 0 ? "warn" : "info",
+      text: `${records.length} application record${records.length === 1 ? "" : "s"} staged for comparison.${structured.length > 0 ? ` ${structured.length} complete structured case${structured.length === 1 ? "" : "s"} loaded.` : ""}${invalid.length > 0 ? ` ${invalid.join("; ")}.` : ""}${omitted > 0 ? ` ${omitted} file${omitted === 1 ? "" : "s"} omitted because the 300-file staging limit was reached.` : ""}`
     });
     input.value = "";
   }
@@ -171,31 +176,41 @@ export default function App() {
     const selectedFiles = Array.from(input.files || []);
     const accepted = selectedFiles.filter((file) => file.type.startsWith("image/"));
     const rejected = selectedFiles.filter((file) => !file.type.startsWith("image/")).map((file) => file.name);
-    setPendingImages((current) => [...current, ...accepted].slice(0, MAX_BATCH_SIZE));
+    const available = Math.max(0, MAX_BATCH_SIZE - pendingImages.length);
+    const staged = accepted.slice(0, available);
+    const omitted = accepted.length - staged.length;
+    setPendingImages((current) => [...current, ...staged].slice(0, MAX_BATCH_SIZE));
     setNotice({
-      tone: rejected.length > 0 ? "warn" : "info",
-      text: `${accepted.length} image${accepted.length === 1 ? "" : "s"} staged for comparison.${rejected.length > 0 ? ` Unsupported files ignored: ${rejected.join(", ")}.` : ""}`
+      tone: rejected.length > 0 || omitted > 0 ? "warn" : "info",
+      text: `${staged.length} image${staged.length === 1 ? "" : "s"} staged for comparison.${rejected.length > 0 ? ` Unsupported files ignored: ${rejected.join(", ")}.` : ""}${omitted > 0 ? ` ${omitted} image${omitted === 1 ? "" : "s"} omitted because the 300-file staging limit was reached.` : ""}`
     });
     input.value = "";
   }
 
   async function compareStagedFiles() {
-    if (pendingImages.length === 0) return;
+    if (pendingImages.length === 0 && pendingApplications.length === 0) return;
     setNotice(null);
     setIsProcessing(true);
     setProgress({ done: 0, total: pendingImages.length });
     try {
-      const applications = new Map(pendingApplications.map((item) => [item.key, item] as const));
-      const paired = new Set<string>();
+      const applications = new Map<string, PendingApplication[]>();
+      pendingApplications.forEach((item) => {
+        const records = applications.get(item.key) ?? [];
+        records.push(item);
+        applications.set(item.key, records);
+      });
+      const paired = new Set<number>();
       let done = 0;
       const read = await processBatch(pendingImages, async (file) => {
         const startedAt = performance.now();
-        const record = applications.get(pairingKey(file.name));
+        const records = applications.get(pairingKey(file.name)) ?? [];
+        const record = records.shift();
         try {
           if (file.size > MAX_UPLOAD_BYTES) {
-            return timed(makeStubCase(file, "rejected", "File exceeds the 10 MB local-demo limit."), startedAt);
+            if (record) paired.add(record.id);
+            return timed(makeStubCase(file, "rejected", "File exceeds the 10 MB local-demo limit.", record?.fields, record?.file.name), startedAt);
           }
-          if (record) paired.add(record.key);
+          if (record) paired.add(record.id);
           const ocr = await recognizeLabel(file);
           return timed(makeOcrCase({
             file,
@@ -219,7 +234,7 @@ export default function App() {
           setProgress({ done, total: pendingImages.length });
         }
       }, DEFAULT_CONCURRENCY);
-      const orphanApplications = pendingApplications.filter((item) => !paired.has(item.key));
+      const orphanApplications = pendingApplications.filter((item) => !paired.has(item.id));
       const orphanCases = orphanApplications.map((item) => makeApplicationOnlyCase(item.file, item.fields));
       const unmatchedImages = read.filter((item) => !item.applicationSource).length;
       const warnings = [
@@ -230,7 +245,7 @@ export default function App() {
       if (read[0] || orphanCases[0]) setSelectedId((read[0] || orphanCases[0]).id);
       setNotice({
         tone: warnings.length > 0 ? "warn" : "info",
-        text: `${read.length} label${read.length === 1 ? "" : "s"} compared. ${paired.size} pair${paired.size === 1 ? "" : "s"} matched by filename.${warnings.length > 0 ? ` ${warnings.join(" ")}` : ""}`
+        text: `${read.length} label${read.length === 1 ? "" : "s"} compared. ${paired.size} pair${paired.size === 1 ? "" : "s"} matched by filename.${orphanCases.length > 0 ? ` ${orphanCases.length} application record${orphanCases.length === 1 ? "" : "s"} added for review.` : ""}${warnings.length > 0 ? ` ${warnings.join(" ")}` : ""}`
       });
       setPendingApplications([]);
       setPendingImages([]);
@@ -246,7 +261,7 @@ export default function App() {
   }
 
   function removeApplication(key: string) {
-    setPendingApplications((current) => current.filter((item) => item.key !== key));
+    setPendingApplications((current) => current.filter((item) => String(item.id) !== key));
   }
 
   function removeImage(file: File) {
@@ -302,7 +317,7 @@ export default function App() {
       const itemSummary = summaries.get(item.id) ?? compareCase(item);
       // A refused file was never compared, so it has no field counts to report.
       const refused = item.ocrStatus === "rejected";
-      const fieldValues = FIELD_DEFINITIONS.flatMap(({ key }) => {
+      const fieldValues = refused ? FIELD_DEFINITIONS.flatMap(() => ["", "", "", "", ""]) : FIELD_DEFINITIONS.flatMap(({ key }) => {
         const result = itemSummary.results.find((candidate) => candidate.key === key);
         return result
           ? [result.applicationValue ?? "", result.labelValue ?? "", result.status, result.matchTier, `${Math.round(result.confidence * 100)}%`]
@@ -347,10 +362,10 @@ export default function App() {
           <div className="sidebar-heading"><div><p className="eyebrow">Verification queue</p><h2>Cases</h2></div><span className="count-badge">0</span></div>
           <div className="upload-heading">Prepare a batch</div>
           <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload application JSON files</strong><span>Stage records here before comparison</span><input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" /></label>
-          <div className="pending-files">{pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.key}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(item.key)} aria-label={`Remove ${item.file.name}`}>x</button></span>)}</div>
+          <div className="pending-files">{pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.id}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(String(item.id))} aria-label={`Remove ${item.file.name}`}>x</button></span>)}</div>
           <label className="upload-box"><span className="upload-icon" aria-hidden="true">↑</span><strong>Upload label images</strong><span>Read locally with OCR · max {MAX_BATCH_SIZE}</span><input type="file" accept="image/*" multiple onChange={stageImageFiles} disabled={isProcessing} aria-label="Upload label images" /></label>
           <div className="pending-files">{pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span className="pending-file" key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button type="button" onClick={() => removeImage(file)} aria-label={`Remove ${file.name}`}>x</button></span>)}</div>
-          <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>{isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}</button>
+          <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || (pendingImages.length === 0 && pendingApplications.length === 0)}>{isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}</button>
           {(pendingApplications.length > 0 || pendingImages.length > 0) && <button className="reset-button" type="button" onClick={resetWorkspace} disabled={isProcessing}>Reset workspace</button>}
           <div className="sidebar-footnote"><strong>Bounded batch processing</strong><span>Up to {MAX_BATCH_SIZE} items, {DEFAULT_CONCURRENCY} in-process workers.</span></div>
         </aside>
@@ -397,7 +412,7 @@ export default function App() {
             <input type="file" accept=".json,application/json" multiple onChange={loadApplicationFiles} disabled={isProcessing} aria-label="Upload application JSON files" />
           </label>
           <div className="pending-files">
-            {pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.key}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(item.key)} aria-label={`Remove ${item.file.name}`}>x</button></span>)}
+            {pendingApplications.length === 0 ? <span>No application records staged</span> : pendingApplications.map((item) => <span className="pending-file" key={item.id}><span>{item.file.name}</span><button type="button" onClick={() => removeApplication(String(item.id))} aria-label={`Remove ${item.file.name}`}>x</button></span>)}
           </div>
           <label className="upload-box">
             <span className="upload-icon" aria-hidden="true">↑</span>
@@ -408,7 +423,7 @@ export default function App() {
           <div className="pending-files">
             {pendingImages.length === 0 ? <span>No label images staged</span> : pendingImages.map((file) => <span className="pending-file" key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button type="button" onClick={() => removeImage(file)} aria-label={`Remove ${file.name}`}>x</button></span>)}
           </div>
-          <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || pendingImages.length === 0}>
+          <button className="primary-button compare-button" type="button" onClick={compareStagedFiles} disabled={isProcessing || (pendingImages.length === 0 && pendingApplications.length === 0)}>
             {isProcessing && progress ? `Comparing ${progress.done} of ${progress.total}...` : "Compare uploaded files"}
           </button>
           {(pendingApplications.length > 0 || pendingImages.length > 0) && <button className="reset-button" type="button" onClick={resetWorkspace} disabled={isProcessing}>Reset workspace</button>}
