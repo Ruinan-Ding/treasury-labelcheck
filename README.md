@@ -84,6 +84,9 @@ The two upload boxes intentionally keep staged application records and label art
 separate. Files may be added at different times; comparison starts only when the agent
 clicks the compare button. Individual staged files can be removed with the `x` control,
 and **Reset workspace** clears the current batch and returns to the blank starting state.
+The compare action can run with JSON records alone, creating explicit application-only
+review cases; images alone are also OCR-processed. Files beyond the 300-file staging
+limit are reported as omitted rather than silently processed.
 Matching is case-insensitive and uses the filename before
 the final extension. The upload sidebar scrolls for large batches without shrinking
 the staged file rows. Unmatched
