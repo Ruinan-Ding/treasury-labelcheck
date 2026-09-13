@@ -93,6 +93,11 @@ can be changed, and its green, yellow, or red indicator appears beside the case 
 the verification queue. This decision is distinct from the automated comparison
 status and is included in the local CSV export.
 
+The CSV includes the complete case summary plus each required field's application
+value, label evidence, status, match tier, and confidence. Paired cases use the
+filename stem as the case name; unmatched files retain their `.json` or image
+extension so the missing pairing is visible.
+
 ## Approach
 
 The core loop the stakeholder interviews describe is: *an agent looks at the label
