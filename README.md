@@ -16,6 +16,8 @@ The deployed site is publicly hosted, but the label data is processed only in th
 reviewer's browser. The interface identifies this as **Browser-only processing** so
 hosting location is not confused with data-processing location.
 
+**Live prototype:** [treasury-labelcheck.vercel.app](https://treasury-labelcheck.vercel.app/)
+
 ---
 
 ## Quick start
@@ -308,7 +310,9 @@ The build output is static; any static host will serve it.
 npm run build   # writes dist/
 ```
 
-`vercel.json` is included for a zero-configuration Vercel deploy. No environment
+`vercel.json` is included for a zero-configuration Vercel deploy. The live prototype
+is available at [treasury-labelcheck.vercel.app](https://treasury-labelcheck.vercel.app/).
+No environment
 variables or credentials are required at runtime. Note that `dist/` includes ~23 MB of
 OCR assets — that is the cost of running OCR without egress, and only the model plus one
 WASM core (~6 MB) is fetched by any given browser.

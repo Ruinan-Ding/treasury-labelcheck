@@ -133,7 +133,7 @@ function percentOf(value: string | null): number | null {
 // line picked up as the brand. Only differences a misread cannot plausibly produce stay
 // a mismatch - two cleanly read numbers that disagree, or a warning prefix set mostly in
 // lowercase. Everything else is held for an agent to check against the artwork.
-// ponytail: a misread digit still reports Mismatch; gate on per-word OCR confidence if that shows up.
+// A misread digit still reports Mismatch; gate on per-word OCR confidence if that shows up.
 function mismatchSurvivesOcr(result: FieldResult, label: LabelFields): boolean {
   switch (result.key) {
     case "governmentWarning":

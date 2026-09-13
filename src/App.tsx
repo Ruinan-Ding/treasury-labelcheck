@@ -13,7 +13,7 @@ import {
   parseApplicationRecord,
   parseStructuredCase
 } from "./lib/cases";
-import { loadWorkspace, saveWorkspace } from "./lib/workspace-store";
+import { clearWorkspace, loadWorkspace, saveWorkspace } from "./lib/workspace-store";
 import type { LabelCase, LabelFields, OcrStatus, VerificationStatus } from "./types";
 
 interface Notice {
@@ -154,7 +154,7 @@ export default function App() {
       });
   }, []);
 
-  // ponytail: the last tab to save wins; give each tab its own record if agents work in several at once.
+  // The last tab to save wins if agents work in several tabs at once.
   useEffect(() => {
     if (storage !== "ready") return;
     saveWorkspace("queue", { cases, pendingApplications, pendingImages }).catch(() =>
@@ -332,6 +332,9 @@ export default function App() {
     setDecisions({});
     setPendingApplications([]);
     setPendingImages([]);
+    void clearWorkspace().catch(() => {
+      setNotice({ tone: "warn", text: "Workspace state was cleared from the screen, but the browser could not clear its saved copy." });
+    });
     // Hands back the ~3 MB language model and the WASM core the OCR worker is holding.
     void terminateOcr();
     setNotice({ tone: "info", text: "Workspace reset." });
