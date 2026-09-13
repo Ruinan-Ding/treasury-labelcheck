@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+examples/
+.env
+.env.*
+!.env.example
+
+# Vendored at build time by scripts/vendor-ocr.mjs from the declared npm dependencies.
+# Keeps ~23 MB of WASM and model binaries out of the repository.
+public/tesseract/

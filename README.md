@@ -1,118 +1,226 @@
-# **Take-Home Project: AI-Powered Alcohol Label Verification App**
+# LabelCheck
 
-## **Project Background & Stakeholder Context**
+A prototype that helps a TTB compliance agent verify an alcohol beverage label against
+its COLA application. Upload the label artwork; the app reads it on the spot, compares
+every mandated field against the application record, and tells the agent which fields it
+is confident about and which ones a human still has to decide.
 
-*The following document contains notes from our discovery sessions with the Compliance Division, along with technical requirements for the prototype. We've included stakeholder feedback to give you context on how this tool will be used.*
+Built for the Treasury IT Specialist (AI) take-home assignment. The brief it answers is
+in [`docs/ASSIGNMENT.md`](docs/ASSIGNMENT.md).
 
-### **Interview Notes: Sarah Chen, Deputy Director of Label Compliance**
+**It runs entirely in the browser.** OCR, comparison, and export all happen on the
+reviewer's machine. Nothing is uploaded, no API key is required, and the app makes no
+outbound request of any kind after the page loads.
 
-*Conducted Tuesday, 3:15 PM — Sarah was running late from her daughter's school play rehearsal*
+---
 
-"Thanks for meeting with me. Sorry about the delay—my daughter's playing the lead in her school's production of *Annie*next week and rehearsals have been crazy. Anyway, let me tell you about what we're dealing with here.
+## Quick start
 
-So the TTB reviews about 150,000 label applications a year. Our team of 47 agents handles all of them. Back in the 80s—before my time—they actually had over 100 agents, but budget cuts, you know how it goes. We've been doing things basically the same way since the COLA system went online in 2003. That was a big upgrade from paper forms, believe it or not.
+Requires Node.js 18+ and npm.
 
-The actual review process is pretty straightforward. An agent pulls up an application, looks at the label artwork, and checks that what's on the label matches what's in the application. Brand name matches? Check. ABV is correct? Check. Government warning is there? Check. It takes maybe 5-10 minutes per application for a simple one, longer if there are issues.
-
-Here's the thing though—and this is what got leadership interested in AI—a lot of what we do is just... matching. Like literally just making sure the number on the form is the same as the number on the label. My agents spend half their day doing what's essentially data entry verification. It's not that they can't do more complex analysis, it's that they're drowning in routine stuff.
-
-Oh, I should mention—we tried a pilot with the scanning vendor last year. Disaster. The system would take 30, 40 seconds sometimes to process a single label. Our agents just went back to doing it by eye because they could do five labels in the time it took the machine to do one. **If we can't get results back in about 5 seconds, nobody's going to use it.** We learned that the hard way.
-
-What else... The agents really vary in their tech comfort level. Dave's been here since the Clinton administration and still prints his emails. Meanwhile, Jenny's fresh out of college and probably could have built this tool herself. We need something **my mother could figure out**—she's 73 and just learned to video call her grandkids last year, if that gives you a benchmark. Half our team is over 50. Clean, obvious, no hunting for buttons.
-
-One more thing that came up in our last team meeting—during peak season, we get these big importers who dump 200, 300 label applications on us at once. Right now we literally have to process them one at a time. If there was some way to **handle batch uploads**, that would be huge. Janet from our Seattle office has been asking about this for years."
-
-### **Interview Notes: Marcus Williams, IT Systems Administrator**
-
-*Coffee chat, Thursday morning*
-
-"Sarah probably gave you the business side. Let me fill you in on some of the technical landscape.
-
-Our current infrastructure is... well, it's government infrastructure, let's leave it at that. We're on Azure now after the migration in 2019. That was a whole thing—don't get me started on the FedRAMP certification process. Took 18 months just for the paperwork.
-
-The COLA system is built on .NET, though there's been talk about modernizing it for years. We had a contractor come in last summer to do an assessment and they quoted us $4.2 million for a full rebuild. That went nowhere, obviously.
-
-For this prototype, we're not looking to integrate with COLA directly—that's a whole different beast with its own authorization requirements. Think of this as a standalone proof-of-concept that could potentially inform future procurement decisions. If it works well, maybe we look at how to incorporate it into the workflow. But that's years away, realistically.
-
-Security-wise, we'd need to be careful with any production deployment—there's PII considerations, document retention policies, the usual federal compliance stuff. But for a prototype? Just don't do anything crazy. We're not storing anything sensitive for this exercise.
-
-Oh, and our network blocks outbound traffic to a lot of domains, so keep that in mind if you're thinking about cloud APIs. During the scanning vendor pilot, half their features didn't work because our firewall blocked connections to their ML endpoints. Classic."
-
-### **Interview Notes: Dave Morrison, Senior Compliance Agent (28 years)**
-
-*Brief hallway conversation*
-
-"Look, I'll be honest, I've seen a lot of these 'modernization' projects come and go. Remember the automated phone system they put in back in 2008? Supposed to reduce call volume. We ended up with more calls because nobody could figure out how to navigate it.
-
-The thing about label review is there's nuance. You can't just pattern match everything. Like, I had one last week where the brand name was 'STONE'S THROW' on the label but 'Stone's Throw' in the application. Technically a mismatch? Sure. But it's obviously the same thing. You need judgment.
-
-That said, I'm not against new tools. If something can help me get through my queue faster, great. Just don't make my life harder in the process. I spend enough time fighting with COLA as it is."
-
-### **Interview Notes: Jenny Park, Junior Compliance Agent (8 months)**
-
-*Teams call, Friday afternoon*
-
-"I'm so excited you're working on this! When I started here, I was kind of shocked at how manual everything is. Like, I literally have a printed checklist on my desk that I go through for every label. Brand name—check with my eyes. ABV—check with my eyes. Warning statement—check with my eyes. It's 2024!
-
-The one thing I'd say is the warning statement check is actually trickier than it sounds. It has to be **exact**. Like, word-for-word, and the 'GOVERNMENT WARNING:' part has to be in all caps and bold. Sarah probably mentioned this but people try to get creative with the warning all the time. Smaller font, different wording, burying it in tiny text. I caught one last month where they used 'Government Warning' in title case instead of all caps. Rejected.
-
-Also—and this is maybe out of scope for a prototype—but it would be amazing if the tool could handle images that aren't perfectly shot. I've seen labels that are photographed at weird angles, or the lighting is bad, or there's glare on the bottle. Right now if an agent can't read the label they just reject it and ask for a better image. But if AI could handle some of that..."
-
-## **Technical Requirements**
-
-You are free to use any programming languages, frameworks, or libraries you prefer. We want to see what kind of engineering, design, and integration decisions you make.
-
-## **Additional Context**
-
-### **About TTB Label Requirements**
-
-For reference, TTB requires specific information on alcohol beverage labels. The exact requirements vary by beverage type (beer, wine, distilled spirits) but common elements include:
-
-- Brand name
-- Class/type designation
-- Alcohol content (with some exceptions for certain wine/beer)
-- Net contents
-- Name and address of bottler/producer
-- Country of origin for imports
-- **Government Health Warning Statement** (mandatory on all alcohol beverages)
-
-We encourage you to review TTB's guidelines at ttb.gov for additional context on label requirements.
-
-### **Sample Label**
-
-Your app should handle labels containing information like the example below:
-
-**Example Distilled Spirits Label Fields:**
-
-- Brand Name: "OLD TOM DISTILLERY"
-- Class/Type: "Kentucky Straight Bourbon Whiskey"
-- Alcohol Content: "45% Alc./Vol. (90 Proof)"
-- Net Contents: "750 mL"
-- Government Warning: \[Standard government warning text\]
-
-*We encourage you to create or source additional test labels—AI image generation tools work well for this.*
-
-## **Deliverables**
-
-1. **Source Code Repository** (GitHub or similar)
-   - All source code
-   - README with setup and run instructions
-   - Brief documentation of approach, tools used, assumptions made
-2. **Deployed Application URL**
-   - Working prototype we can access and test
-
-## **Evaluation Criteria**
-
-- Correctness and completeness of core requirements
-- Code quality and organization
-- Appropriate technical choices for the scope
-- User experience and error handling
-- Attention to requirements
-- Creative problem-solving
-
-We understand this is time-constrained. A working core application with clean code is preferred over ambitious but incomplete features. Document any trade-offs or limitations.
-
-*Questions? Reach out for clarification—though we also value how you fill in gaps independently.*
-
-Good luck!
+```bash
+npm install
+npm run dev
 ```
+
+Open the URL Vite prints (normally `http://localhost:5173`).
+
+```bash
+npm test         # 52 tests
+npm run build    # type-check and produce dist/
+npm run preview  # serve the production build
+```
+
+`npm install` pulls the OCR engine; `npm run dev` and `npm run build` then copy its
+worker, WASM core, and English model into `public/tesseract/` automatically. No manual
+step, and no network access is needed once `npm install` has finished.
+
+## Try it
+
+Three sample labels are in [`public/samples/`](public/samples), each with a matching
+application record. **Select the `.png` and the `.json` of the same name together** and
+the app pairs them:
+
+| Upload | What it demonstrates |
+| --- | --- |
+| `old-tom.png` + `old-tom.json` | A clean pass. Six fields verify; the warning is held for a human because bold cannot be proven from an image. |
+| `stones-throw.png` + `stones-throw.json` | Dave Morrison's judgment case: the label says `STONE'S THROW`, the application says `Stone's Throw`. Reported as a **normalized match**, not a mismatch. |
+| `harbor-mist.png` + `harbor-mist.json` | Jenny Park's rejection case: correct warning wording in title case is a **mismatch**, alongside a genuine ABV and volume discrepancy. |
+
+Upload a label image on its own and it is still read and checked against the statutory
+warning — that requirement comes from law, not from the application record.
+
+`sample-case.json` exercises the structured path with no image at all.
+
+## Approach
+
+The core loop the stakeholder interviews describe is: *an agent looks at the label
+artwork and checks it against the application*. So the prototype had to actually read a
+label, not ask the agent to transcribe one.
+
+**Reading the label.** Tesseract is compiled to WebAssembly and runs in the browser.
+Marcus Williams' notes say the TTB network blocks outbound traffic to most domains, and
+that the previous vendor pilot failed for exactly that reason, so a cloud OCR API was
+never a viable choice. The worker, the WASM core, and the ~2.9 MB English model are
+served from the app's own origin — `scripts/vendor-ocr.mjs` copies them out of
+`node_modules` at build time, which also keeps ~23 MB of binaries out of git.
+
+**Reading the fields.** `src/lib/extract.ts` turns recognised text into the same
+`LabelFields` shape a JSON upload produces, so both inputs meet identical comparison
+rules. Every rule is anchored to wording TTB actually mandates — the statutory warning, a
+percentage beside an alcohol term, a volume beside a real unit, a "bottled by" statement,
+a "product of" statement. Only the brand name is resolved positionally, because it is the
+one field with no required phrasing. **A field that cannot be found stays null and is
+reported as Review; it is never guessed.**
+
+**Pairing.** A peak-season batch arrives as a folder of artwork plus the matching
+records, so `old-tom.png` is compared against `old-tom.json`. Matching on the filename the
+submitter already uses avoids inventing a manifest format for a prototype. An application
+record whose image never arrived is reported, not silently dropped.
+
+**Deciding.** `src/lib/verification.ts` holds every comparison rule. Each field gets a
+status (Match / Mismatch / Review), a tier (exact / normalized), and a confidence figure.
+The app never decides a case — it sorts the obvious from the ones needing judgment, which
+is what Sarah Chen said her agents actually need.
+
+### How each field is judged
+
+- **Government warning** — checked verbatim against 27 CFR 16.21: wording,
+  capitalization, and punctuation must match, and only differences in how the source
+  wrapped whitespace are tolerated. Title case in the prefix is a mismatch. Because the
+  statute governs the label rather than the application, a lone label image is still
+  checked against it.
+- **Brand name** — accents are decomposed so they are stripped from their base letter
+  rather than erasing the character (`MÖET` and `MÄET` must not normalize alike), then
+  case and punctuation are normalized. This is what makes `STONE'S THROW` and
+  `Stone's Throw` the same brand.
+- **Net contents** — converted to millilitres when the unit is explicit. The unit is read
+  from the text beside the matched number, so `750 mL (25.4 FL OZ)` reads as 750 mL, not
+  as its parenthetical equivalent. A comma is a thousands separator when it groups three
+  digits and a decimal separator otherwise. Equivalent volumes match within 1 mL.
+- **Alcohol content** — common notations are normalized (`45% by volume`, `45% Alc./Vol.`,
+  `45% ABV`) without converting or inferring any value.
+- **Everything else** — whitespace and case normalization only.
+- **Missing values** — a blank on either side is Review, never a mismatch. A gap in the
+  application is a data-entry problem for an agent, not evidence against the label.
+
+Confidence reports how certain a rule is about the verdict it returned: an exact string
+verify (0.99) outranks one that needed normalization (0.90); a mismatch is 0.95 and
+anything held for a human is 0.35. A fuzzier judgement never outranks a stricter one. It
+is a transparent rule-based signal, **not** a calibrated model probability.
+
+### Meeting the interview constraints
+
+| Constraint | How it is met |
+| --- | --- |
+| Results in ~5 seconds (Sarah) | 1.0–2.3 s per label measured end to end, including field extraction. Each case reports its own time. The OCR worker is created once and reused, so the model load is paid once per session rather than per label. |
+| Usable by a 73-year-old; half the team is 50+ (Sarah) | Every text colour meets WCAG AA contrast, body and comparison text is at least 11px, status is carried by text and glyph as well as colour, every control has a visible focus ring, and the batch reports progress instead of going quiet. |
+| Batch of 200–300 (Sarah, Janet) | Cap is 300, above the largest batch described. Three workers run concurrently, input order is preserved, and one bad file never discards the batch. |
+| No cloud APIs; firewall blocks egress (Marcus) | Zero outbound requests after page load. OCR assets are same-origin. |
+| No PII, no COLA integration (Marcus) | No persistence, no network, no credentials. Object URLs are released when the queue is cleared. |
+| Judgment, not blind pattern matching (Dave) | Normalization tiers separate an exact verify from a harmless formatting difference, and anything uncertain is handed to the agent rather than auto-decided. |
+| Warning exact, all-caps and bold (Jenny) | Verbatim statutory comparison plus a separate capitalization check. Bold is treated as unprovable from an image — see below. |
+| Imperfect images (Jenny) | Grayscale plus a contrast stretch recovers text from flatly under- or over-exposed photographs. Skew, perspective, and glare are not corrected. |
+
+## Tools used
+
+| Tool | Why |
+| --- | --- |
+| React 18 + TypeScript + Vite | A static SPA needs no server, which makes the no-egress constraint trivially satisfiable and the deployment a plain file copy. |
+| tesseract.js 7 (+ `@tesseract.js-data/eng`) | The only mature OCR engine that runs fully client-side. Pinned to the LSTM engine, with page segmentation set to `AUTO`. |
+| Vitest | Same toolchain as Vite; no extra configuration. |
+
+Runtime dependencies are React, React DOM, and tesseract.js. Everything else is a build or
+test dependency, and `npm audit` reports no vulnerabilities.
+
+## Assumptions and trade-offs
+
+- **Bold cannot be proven from recognised text**, so the warning on an image is never
+  auto-passed — it is held for human confirmation with the reason stated. This is
+  deliberate: Jenny Park's requirement is that the prefix be all caps *and* bold, and
+  claiming to have verified something the reader cannot see would be worse than saying so.
+  A structured upload may assert `warningBold` explicitly.
+- **OCR is a reading aid, not a decision-maker.** Recognised text is shown in full beside
+  the artwork so an agent who disagrees with a field can see exactly what the reader saw.
+- **The application record is trusted input; uploaded files are not.** Uploaded JSON is
+  validated into `LabelFields`, non-string values are coerced or dropped, and case ids are
+  always minted by the app so an uploaded file cannot collide with another case. CSV cells
+  beginning `=`, `+`, `-`, or `@` are quoted so a spreadsheet will not execute them as
+  formulas.
+- **A refused file reports `Not processed`, not seven Review rows** — it never reached the
+  comparison rules, and implying a review that never happened would be misleading. An
+  unreadable *label* is different: it lists its fields, because an agent does have to look.
+- **Uploads are capped at 10 MB and must be JSON or an image.** Batches over 300 report
+  how many files were not processed rather than silently truncating.
+- **Confidence is a UI signal, not a probability.** See above.
+- **Normalization is deliberately narrow.** It covers harmless brand formatting,
+  whitespace and case, and explicitly labelled units. It never infers a missing value or
+  guesses a unit from a bare number.
+
+## Limitations and what I would do next
+
+- **Geometry is not corrected.** A label photographed at an angle or with glare will read
+  poorly. Deskew and perspective correction are the natural next step and were out of
+  scope here.
+- **Brand name is positional.** It is the first line no stronger rule claimed. A label
+  with heavy decorative text above the brand could mislead it; the recognised-text panel
+  exists partly so an agent can catch that.
+- **OCR is serialized on one worker.** It is CPU-bound, so a 300-image batch is a
+  background job, not an interactive wait. A worker pool sized to `hardwareConcurrency`
+  would be the first optimization if throughput mattered.
+- **English only**, and no COLA integration — Marcus explicitly scoped that out.
+- **Nothing persists.** Reload and the queue is empty. Real use would need a review
+  record, which brings the retention and PII questions Marcus flagged.
+
+## Testing
+
+52 tests across five files:
+
+| File | Covers |
+| --- | --- |
+| `src/lib/verification.test.ts` | Comparison rules: warning validation, alcohol notation, pass/mismatch/review outcomes. |
+| `src/lib/regressions.test.ts` | Edge cases pinned after they were found: statutory wording, dual-unit and comma-grouped volumes, accented brands, locale-invariant folding, blank values, statute-only warning checks, confidence ordering. |
+| `src/lib/extract.test.ts` | OCR field extraction, including the title-case rejection and refusing to read a proof number as a volume. |
+| `src/lib/cases.test.ts` | The untrusted-upload boundary: CSV formula escaping, id uniqueness, malformed JSON. |
+| `src/lib/batch.test.ts` | Input-order preservation, the cap, bounded concurrency, error propagation. |
+
+## Project layout
+
+```
+src/
+  App.tsx              review workspace, upload flow, CSV export
+  ErrorBoundary.tsx    keeps a render failure from discarding the queue
+  lib/ocr.ts           Tesseract worker, preprocessing, asset wiring
+  lib/extract.ts       recognised text -> LabelFields
+  lib/verification.ts  all comparison rules
+  lib/cases.ts         untrusted-input boundary, filename pairing
+  lib/batch.ts         bounded concurrent batch processing
+  data/fixtures.ts     sample cases and the 27 CFR 16.21 warning text
+scripts/vendor-ocr.mjs copies OCR assets from node_modules at build time
+public/samples/        sample label artwork and application records
+```
+
+## Deployment
+
+The build output is static; any static host will serve it.
+
+```bash
+npm run build   # writes dist/
+```
+
+`vercel.json` is included for a zero-configuration Vercel deploy. No environment
+variables or credentials are required at runtime. Note that `dist/` includes ~23 MB of
+OCR assets — that is the cost of running OCR without egress, and only the model plus one
+WASM core (~6 MB) is fetched by any given browser.
+
+GitHub Pages is also configured through `.github/workflows/deploy-pages.yml`.
+Enable **Settings → Pages → Source: GitHub Actions** in the repository, then
+push to `main` or run the workflow manually. The published site will be:
+
+```text
+https://treasurytakehome-rgb.github.io/instructions/
+```
+
+The Vite build automatically uses `/instructions/` as its asset base on GitHub
+Actions builds, so the bundled OCR worker, WASM, and language model resolve
+correctly from the project site. Local development continues to use `/`.

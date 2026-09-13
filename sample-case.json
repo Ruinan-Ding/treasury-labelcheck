@@ -1,0 +1,25 @@
+{
+  "id": "local-example",
+  "name": "Local example",
+  "description": "A minimal structured case for demonstrating a normalized brand match.",
+  "application": {
+    "brandName": "OLD TOM DISTILLERY",
+    "classType": "Kentucky Straight Bourbon Whiskey",
+    "alcoholContent": "45% Alc./Vol. (90 Proof)",
+    "netContents": "750 mL",
+    "bottlerProducer": "Old Tom Distillery, Frankfort, KY",
+    "countryOfOrigin": "United States",
+    "governmentWarning": "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems."
+  },
+  "label": {
+    "brandName": "Old Tom Distillery",
+    "classType": "Kentucky Straight Bourbon Whiskey",
+    "alcoholContent": "45% Alc./Vol. (90 Proof)",
+    "netContents": "750 mL",
+    "bottlerProducer": "Old Tom Distillery, Frankfort, KY",
+    "countryOfOrigin": "United States",
+    "governmentWarning": "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.",
+    "warningPrefixAllCaps": true,
+    "warningBold": true
+  }
+}
