@@ -50,8 +50,12 @@ function inputStatusLabel(status: OcrStatus): string {
         : "Unreadable input";
 }
 
+function baseCaseName(item: LabelCase): string {
+  return item.pairingStatus === "unmatched" ? item.name : item.name.replace(/\.[^.]+$/, "");
+}
+
 function exportCaseName(item: LabelCase, occurrences: Map<string, number>): string {
-  const baseName = item.pairingStatus === "unmatched" ? item.name : item.name.replace(/\.[^.]+$/, "");
+  const baseName = baseCaseName(item);
   const occurrence = (occurrences.get(baseName) ?? 0) + 1;
   occurrences.set(baseName, occurrence);
   return occurrence === 1 ? baseName : `${baseName} (${occurrence})`;
@@ -108,6 +112,15 @@ export default function App() {
   const [pendingImages, setPendingImages] = useState<File[]>([]);
 
   const selected = cases.find((item) => item.id === selectedId) || cases[0];
+  const displayNames = useMemo(() => {
+    const occurrences = new Map<string, number>();
+    return new Map(cases.map((item) => {
+      const baseName = baseCaseName(item);
+      const occurrence = (occurrences.get(baseName) ?? 0) + 1;
+      occurrences.set(baseName, occurrence);
+      return [item.id, occurrence === 1 ? baseName : `${baseName} (${occurrence})`] as const;
+    }));
+  }, [cases]);
   // One pass per case list rather than one per case per render: the sidebar and the
   // CSV export both read from here.
   const summaries = useMemo(
@@ -415,7 +428,7 @@ export default function App() {
                   <span className={`mini-status mini-${item.pairingStatus === "unmatched" ? "unmatched" : overall}`} aria-hidden="true">{item.pairingStatus === "unmatched" ? "↔" : statusIcon(overall)}</span>
                   <span className="visually-hidden">{item.pairingStatus === "unmatched" ? "Unmatched pairing: " : `${statusLabel(overall)}: `}</span>
                   <span className="case-button-text">
-                    <strong>{item.name}</strong>
+                    <strong>{displayNames.get(item.id) ?? item.name}</strong>
                     <small>{item.sourceName && item.sourceName !== item.name ? item.sourceName : item.description}</small>
                   </span>
                   <span className="chevron" aria-hidden="true">›</span>
@@ -433,7 +446,7 @@ export default function App() {
           <section className="page-heading">
             <div>
               <p className="eyebrow">Case review</p>
-              <h2>{selected.name}</h2>
+              <h2>{displayNames.get(selected.id) ?? selected.name}</h2>
               <p className="subheading">{selected.description}</p>
             </div>
             <div className="heading-actions">
