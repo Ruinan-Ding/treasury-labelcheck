@@ -80,7 +80,12 @@ Matching is case-insensitive and uses the filename before
 the final extension. The upload sidebar scrolls for large batches without shrinking
 the staged file rows. Unmatched
 records and images are still processed into explicit review cases with a red `!` queue
-icon rather than being dropped or paired by upload order.
+icon rather than being dropped or paired by upload order. An unmatched pairing uses a
+separate `↔` icon; `!` is reserved for a confirmed comparison mismatch.
+
+Comparing another staged batch adds its cases to the existing verification queue; it
+does not replace earlier results. Use **Reset workspace** when starting a completely
+new queue.
 
 After inspecting a case, the agent can record a separate human decision:
 **Accept**, **Needs review**, or **Reject**. The selected decision is grayed out but

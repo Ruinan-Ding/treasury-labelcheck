@@ -94,6 +94,7 @@ button { cursor: pointer; }
 .mini-match, .status-mark { color: #147658; background: #dff4e9; }
 .mini-mismatch { color: #af443b; background: #fce8e5; }
 .mini-review { color: #7d5609; background: #fff0cc; }
+.mini-unmatched { color: #496b78; background: #e4eff2; }
 .decision-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; }
 .decision-dot.decision-accept { background: #168260; }
 .decision-dot.decision-review { background: #d09a22; }

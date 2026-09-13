@@ -373,8 +373,8 @@ export default function App() {
                   onClick={() => selectCase(item.id)}
                 >
                   {decisions[item.id] && <span className={`decision-dot decision-${decisions[item.id]}`} aria-label={`Human decision: ${decisions[item.id]}`} />}
-                  <span className={`mini-status mini-${item.pairingStatus === "unmatched" ? "mismatch" : overall}`} aria-hidden="true">{item.pairingStatus === "unmatched" ? "!" : statusIcon(overall)}</span>
-                  <span className="visually-hidden">{item.pairingStatus === "unmatched" ? "Unmatched file: " : `${statusLabel(overall)}: `}</span>
+                  <span className={`mini-status mini-${item.pairingStatus === "unmatched" ? "unmatched" : overall}`} aria-hidden="true">{item.pairingStatus === "unmatched" ? "↔" : statusIcon(overall)}</span>
+                  <span className="visually-hidden">{item.pairingStatus === "unmatched" ? "Unmatched pairing: " : `${statusLabel(overall)}: `}</span>
                   <span className="case-button-text">
                     <strong>{item.name}</strong>
                     <small>{item.sourceName && item.sourceName !== item.name ? item.sourceName : item.description}</small>
